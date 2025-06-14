@@ -1,228 +1,150 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marp PWA スライドエディター</title>
-    <meta name="description" content="MarkdownからMarpスライドを作成するPWAアプリケーション">
-    <meta name="theme-color" content="#21808d">
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
-    
-    <!-- Core CSS -->
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- 外部ライブラリ -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Marp PWA - Markdown to Slide Converter</title>
+  <link rel="manifest" href="manifest_fixed.json">
+  <link rel="stylesheet" href="style.css">
+  <!-- CodeMirror CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/default.min.css">
 </head>
 <body>
-    <!-- ローディング画面 -->
-    <div id="loading" class="loading">
-        <div class="loading-spinner"></div>
-        <p>アプリケーションを初期化中...</p>
+  <!-- ローディング画面 -->
+  <div id="loading" class="loading" style="display:none;">
+    <div class="loading-spinner"></div>
+    <div>処理中...</div>
+  </div>
+  <!-- エラー表示 -->
+  <div id="error-display" class="error-display" style="display:none;">
+    <div class="error-content">
+      <h2>⚠️ エラーが発生しました</h2>
+      <div id="error-message"></div>
+      <button id="error-close" class="btn btn--primary">閉じる</button>
     </div>
-
-    <!-- エラー表示 -->
-    <div id="errorDisplay" class="error-display hidden">
-        <div class="error-content">
-            <h2>⚠️ エラーが発生しました</h2>
-            <p id="errorMessage">アプリケーションの初期化に失敗しました。</p>
-            <button id="retryBtn" class="btn btn-primary">再試行</button>
+  </div>
+  <!-- 成功メッセージ -->
+  <div id="success-display" class="status-message status-message--success" style="display:none;">
+    <span id="success-message"></span>
+    <button id="success-close" class="btn btn--sm">×</button>
+  </div>
+  <!-- メインアプリ -->
+  <div class="app">
+    <header class="app-header">
+      <div class="header-content">
+        <span class="app-title">Marp PWA - Markdown to Slide Converter</span>
+        <div class="header-actions">
+          <button id="save-md-btn" class="btn btn--outline" title="Markdownをダウンロード">💾 保存</button>
+          <button id="export-pdf" class="btn btn--outline" title="PDF出力">📄 PDF</button>
+          <button id="export-pptx" class="btn btn--outline" title="PPTX出力">📊 PPTX</button>
+          <button id="export-html" class="btn btn--outline" title="HTML出力">🌐 HTML</button>
+          <button id="settings-btn" class="btn btn--outline" title="設定">⚙️ 設定</button>
+          <button id="preview-toggle" class="btn btn--outline" title="プレビュー切替">🖥️/📄</button>
         </div>
+      </div>
+    </header>
+    <main class="app-main">
+      <section class="editor-panel">
+        <div class="panel-header">
+          <h2>Markdown入力</h2>
+          <div class="editor-status">
+            <span id="char-count">0 文字</span>
+            <span id="save-status">未保存</span>
+          </div>
+        </div>
+        <div class="editor-container">
+          <textarea id="markdown-editor" class="form-control" spellcheck="false"></textarea>
+        </div>
+      </section>
+      <section class="preview-panel">
+        <div class="panel-header">
+          <h2 id="preview-title">リアルタイムプレビュー</h2>
+          <div class="preview-controls">
+            <button id="prev-slide" class="btn btn--sm" title="前のスライド">◀</button>
+            <span id="slide-counter">1 / 1</span>
+            <button id="next-slide" class="btn btn--sm" title="次のスライド">▶</button>
+          </div>
+        </div>
+        <div class="preview-container">
+          <div id="preview-content" class="preview-content">
+            <p>プレビューするMarkdownを入力してください</p>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- 設定パネル -->
+    <div id="settings-panel" class="modal hidden">
+      <div class="modal-content settings-content" onclick="event.stopPropagation();">
+        <div class="modal-header">
+          <h3>設定</h3>
+          <button id="settings-close" class="btn btn--sm">×</button>
+        </div>
+        <div class="modal-body">
+          <form id="settings-form">
+            <div class="form-group">
+              <label class="form-label" for="theme-select">テーマ</label>
+              <select id="theme-select" class="form-control">
+                <option value="default">Default</option>
+                <option value="gaia">Gaia</option>
+                <option value="uncover">Uncover</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">フォントサイズ</label>
+              <div>
+                <label><input type="radio" name="font-size" value="small" id="font-size-small"> 小</label>
+                <label><input type="radio" name="font-size" value="medium" id="font-size-medium" checked> 中</label>
+                <label><input type="radio" name="font-size" value="large" id="font-size-large"> 大</label>
+                <label><input type="radio" name="font-size" value="custom" id="font-size-custom"> カスタム</label>
+                <input type="number" id="custom-font-size" class="form-control" min="8" max="64" step="1" value="16" style="width:80px;display:inline-block;" disabled> <span>px</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="slide-ratio-select">スライド比率</label>
+              <select id="slide-ratio-select" class="form-control">
+                <option value="16:9">16:9</option>
+                <option value="4:3">4:3</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="background-color">背景色</label>
+              <input type="color" id="background-color" class="form-control" value="#ffffff">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="text-color">文字色</label>
+              <input type="color" id="text-color" class="form-control" value="#000000">
+            </div>
+            <div class="form-group" style="display:flex;gap:8px;">
+              <button type="button" id="reset-settings" class="btn btn--secondary">リセット</button>
+              <button type="button" id="apply-settings" class="btn btn--primary">適用</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
-
-    <!-- メインアプリケーション -->
-    <div id="app" class="app hidden">
-        <!-- ヘッダー -->
-        <header class="header">
-            <div class="container">
-                <div class="header-content">
-                    <h1 class="app-title">Marp PWA エディター</h1>
-                    <div class="toolbar">
-                        <button id="saveBtn" class="btn btn-outline" title="Markdownとして保存">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                            保存
-                        </button>
-                        <button id="exportBtn" class="btn btn-outline" title="エクスポート">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            エクスポート
-                        </button>
-                        <button id="settingsBtn" class="btn btn-outline" title="設定">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                            設定
-                        </button>
-                        <button id="previewToggle" class="btn btn-outline" title="プレビュー切替">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
-                            プレビュー切替
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- メインコンテンツ -->
-        <main class="main-content">
-            <div class="container">
-                <div class="editor-layout">
-                    <!-- エディターペイン -->
-                    <div class="editor-pane">
-                        <div class="pane-header">
-                            <h3>Markdownエディター</h3>
-                            <div class="editor-status">
-                                <span id="charCount">0 文字</span>
-                                <span id="saveStatus" class="save-status saved">保存済み</span>
-                            </div>
-                        </div>
-                        <div class="editor-container">
-                            <textarea id="markdownEditor" spellcheck="false"></textarea>
-                        </div>
-                    </div>
-
-                    <!-- プレビューペイン -->
-                    <div class="preview-pane">
-                        <div class="pane-header">
-                            <h3 id="previewTitle">スライドプレビュー</h3>
-                            <div class="preview-controls">
-                                <button id="prevSlide" class="btn btn-sm btn-outline" title="前のスライド">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                                </button>
-                                <span id="slideCounter">1 / 1</span>
-                                <button id="nextSlide" class="btn btn-sm btn-outline" title="次のスライド">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="preview-container">
-                            <div id="previewContent"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <!-- フッター -->
-        <footer class="footer">
-            <div class="container">
-                <div class="footer-content">
-                    <p>Marp PWA スライドエディター</p>
-                    <div class="footer-links">
-                        <a href="https://marp.app/" target="_blank" rel="noopener">Marp公式サイト</a>
-                    </div>
-                </div>
-            </div>
-        </footer>
-
-        <!-- エクスポートモーダル -->
-        <div id="exportModal" class="modal hidden">
-            <div class="modal-overlay"></div>
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>エクスポート</h3>
-                    <button id="closeExport" class="btn-close" aria-label="閉じる">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="export-options">
-                        <button id="exportPdf" class="btn btn-full-width btn-primary mb-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                            PDFとして保存
-                        </button>
-                        <button id="exportPptx" class="btn btn-full-width btn-primary mb-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-                            PowerPointとして保存
-                        </button>
-                        <button id="exportHtml" class="btn btn-full-width btn-primary mb-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-                            HTMLとして保存
-                        </button>
-                        <button id="exportMarkdown" class="btn btn-full-width btn-secondary">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                            Markdownとして保存
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 設定モーダル -->
-        <div id="settingsModal" class="modal hidden">
-            <div class="modal-overlay"></div>
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>設定</h3>
-                    <button id="closeSettings" class="btn-close" aria-label="閉じる">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <form id="settingsForm" class="settings-form">
-                        <div class="form-group">
-                            <label for="themeSelect" class="form-label">テーマ</label>
-                            <select id="themeSelect" class="form-control">
-                                <option value="default">Default</option>
-                                <option value="gaia">Gaia</option>
-                                <option value="uncover">Uncover</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="fontSizeSelect" class="form-label">フォントサイズ</label>
-                            <select id="fontSizeSelect" class="form-control">
-                                <option value="small">小</option>
-                                <option value="medium" selected>中</option>
-                                <option value="large">大</option>
-                                <option value="custom">カスタム</option>
-                            </select>
-                        </div>
-                        <div id="customFontSizeGroup" class="form-group hidden">
-                            <label for="customFontSize" class="form-label">カスタムサイズ (px)</label>
-                            <input type="number" id="customFontSize" class="form-control" value="16" min="8" max="32">
-                        </div>
-                        <div class="form-group">
-                            <label for="ratioSelect" class="form-label">スライド比率</label>
-                            <select id="ratioSelect" class="form-control">
-                                <option value="16:9" selected>16:9</option>
-                                <option value="4:3">4:3</option>
-                            </select>
-                        </div>
-                        <div class="settings-actions">
-                            <button type="button" id="resetSettings" class="btn btn-outline">リセット</button>
-                            <button type="button" id="applySettings" class="btn btn-primary">適用</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- ステータスメッセージ -->
-        <div id="statusToast" class="status-toast hidden">
-            <div class="status-content">
-                <p id="statusMessage"></p>
-                <button id="closeStatus" class="btn-close" aria-label="閉じる">&times;</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 外部ライブラリの読み込み -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
-    
-    <!-- Service Worker -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(function(registration) {
-                        console.log('Service Worker 登録成功:', registration.scope);
-                    })
-                    .catch(function(error) {
-                        console.log('Service Worker 登録失敗:', error);
-                    });
-            });
-        }
-    </script>
-
-    <!-- メインアプリ -->
-    <script src="app.js"></script>
+    <!-- 設定パネルの背景クリックで閉じる -->
+    <div class="settings-overlay modal hidden" id="settings-overlay"></div>
+  </div>
+  <!-- 必須ライブラリCDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@marp-team/marp-core@4/lib/browser.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+  <!-- アプリ本体 -->
+  <script src="app_fixed.js"></script>
+  <!-- Service Worker登録 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw_fixed.js').then(function(reg) {
+          console.log('Service Worker registered:', reg);
+        }).catch(function(err) {
+          console.warn('Service Worker registration failed:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
