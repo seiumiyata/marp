@@ -69,37 +69,33 @@ document.addEventListener('DOMContentLoaded', async function() {
 function waitForLibraries() {
     return new Promise((resolve, reject) => {
         let attempts = 0;
-        const maxAttempts = 100; // 試行回数を増加
+        const maxAttempts = 50;
         
         const checkLibraries = () => {
             attempts++;
             console.log(`Checking libraries attempt ${attempts}`);
             
-            // より詳細なライブラリチェック
-            const marpLoaded = typeof Marp !== 'undefined' && Marp.Marp;
+            // CodeMirrorとmarkedのみチェック
             const codeMirrorLoaded = typeof CodeMirror !== 'undefined';
             const markedLoaded = typeof marked !== 'undefined';
             
             console.log('Library status:', {
-                marp: marpLoaded,
                 codeMirror: codeMirrorLoaded,
                 marked: markedLoaded
             });
             
-            if (marpLoaded && codeMirrorLoaded) {
-                console.log('Essential libraries loaded successfully');
+            if (codeMirrorLoaded || attempts >= maxAttempts) {
+                console.log('Libraries check completed');
                 resolve();
-            } else if (attempts >= maxAttempts) {
-                console.log('Libraries failed to load, using fallback');
-                resolve(); // reject ではなく resolve で続行
             } else {
-                setTimeout(checkLibraries, 300); // 待機時間を増加
+                setTimeout(checkLibraries, 200);
             }
         };
         
         checkLibraries();
     });
 }
+
 
 // Initialize Marp with error handling
 async function initializeMarp() {
