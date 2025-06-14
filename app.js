@@ -843,3 +843,198 @@ function initializeFallback() {
     loadDefaultContent();
     showSuccess('フォールバックモードで初期化されました');
 }
+// 不足している関数を追加（app.jsの最後に追加）
+
+function loadDefaultContent() {
+    if (editor) {
+        editor.setValue(defaultMarkdown);
+        updatePreview();
+        updateCharCount();
+        setSaveStatus('saved');
+    }
+}
+
+function updateCharCount() {
+    const charCountElement = document.getElementById('char-count');
+    if (charCountElement && editor) {
+        const count = editor.getValue().length;
+        charCountElement.textContent = `${count} 文字`;
+    }
+}
+
+function setSaveStatus(status) {
+    const saveStatusElement = document.getElementById('save-status');
+    if (saveStatusElement) {
+        saveStatusElement.textContent = status === 'saved' ? '保存済み' : 
+                                       status === 'saving' ? '保存中' : '未保存';
+        saveStatusElement.className = `save-status ${status}`;
+    }
+}
+
+function scheduleAutoSave() {
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+    }
+    autoSaveTimer = setTimeout(() => {
+        console.log('Auto-save triggered');
+    }, 5000);
+}
+
+function openSettings() {
+    const settingsPanel = document.querySelector('.settings-panel');
+    if (settingsPanel) {
+        settingsPanel.classList.add('show');
+    }
+}
+
+function closeSettings() {
+    const settingsPanel = document.querySelector('.settings-panel');
+    if (settingsPanel) {
+        settingsPanel.classList.remove('show');
+    }
+}
+
+function resetSettings() {
+    currentSettings = {
+        theme: 'default',
+        fontSize: 'medium',
+        customFontSize: 16,
+        slideRatio: '16:9',
+        backgroundColor: '#ffffff',
+        textColor: '#000000'
+    };
+    
+    populateSettingsForm();
+    showSuccess('設定をリセットしました');
+}
+
+function saveMarkdownFile() {
+    if (!editor) return;
+    
+    const markdown = editor.getValue();
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'presentation.md';
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    setSaveStatus('saved');
+    showSuccess('ファイルを保存しました');
+}
+
+function exportToHTML() {
+    if (!editor) return;
+    
+    try {
+        showLoading();
+        
+        const markdown = editor.getValue();
+        if (!markdown.trim()) {
+            throw new Error('エクスポートするコンテンツがありません');
+        }
+        
+        let html;
+        if (marp) {
+            const result = marp.render(markdown);
+            html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Marp Presentation</title>
+    <style>${result.css}</style>
+</head>
+<body>
+    ${result.html}
+</body>
+</html>`;
+        } else {
+            const content = typeof marked !== 'undefined' ? 
+                marked.parse(markdown) : 
+                markdown.replace(/\n/g, '<br>');
+            html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Markdown Presentation</title>
+</head>
+<body>
+    ${content}
+</body>
+</html>`;
+        }
+        
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'presentation.html';
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showSuccess('HTMLファイルの出力が完了しました');
+    } catch (error) {
+        console.error('HTML export failed:', error);
+        showError('HTMLファイルの出力に失敗しました: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+function populateSettingsForm() {
+    try {
+        const themeSelect = document.getElementById('theme-select');
+        const fontSizeSelect = document.getElementById('font-size-select');
+        const customFontSize = document.getElementById('custom-font-size');
+        const slideRatioSelect = document.getElementById('slide-ratio-select');
+        const backgroundColor = document.getElementById('background-color');
+        const textColor = document.getElementById('text-color');
+        
+        if (themeSelect) themeSelect.value = currentSettings.theme;
+        if (fontSizeSelect) fontSizeSelect.value = currentSettings.fontSize;
+        if (customFontSize) customFontSize.value = currentSettings.customFontSize;
+        if (slideRatioSelect) slideRatioSelect.value = currentSettings.slideRatio;
+        if (backgroundColor) backgroundColor.value = currentSettings.backgroundColor;
+        if (textColor) textColor.value = currentSettings.textColor;
+    } catch (error) {
+        console.error('Form population failed:', error);
+    }
+}
+
+function updateSlideCounter() {
+    const slideCounter = document.getElementById('slide-counter');
+    if (slideCounter) {
+        slideCounter.textContent = `${currentSlideIndex + 1} / ${totalSlides}`;
+    }
+}
+
+function initializeFallback() {
+    console.log('Initializing fallback mode');
+    
+    const textarea = document.getElementById('markdown-editor');
+    if (textarea) {
+        initializeFallbackEditor(textarea);
+    }
+    
+    loadDefaultContent();
+    showSuccess('フォールバックモードで初期化されました');
+}
+
+// 設定読み込み関数
+function loadSettings() {
+    try {
+        const saved = localStorage.getItem('marpSettings');
+        if (saved) {
+            currentSettings = { ...currentSettings, ...JSON.parse(saved) };
+            populateSettingsForm();
+        }
+    } catch (error) {
+        console.error('Settings loading failed:', error);
+    }
+}
+
+// 初期化時に設定を読み込み
+document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+});
