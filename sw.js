@@ -12,15 +12,17 @@ const STATIC_FILES = [
     // Add any local assets here
 ];
 
-// CDN resources to cache
+// CDN resources to cache の修正
 const CDN_RESOURCES = [
     'https://cdn.jsdelivr.net/npm/@marp-team/marp-core@latest/lib/browser.js',
     'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css',
+    'https://cdn.jsdelivr.net/npm/marked@latest/marked.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
     'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js'
 ];
+
 
 // Install event - cache static files
 self.addEventListener('install', event => {
