@@ -306,69 +306,108 @@ function togglePreviewMode() {
 }
 
 // シンプルなスライド作成関数を追加
+// createSimpleSlides関数を以下に完全に置き換え
 function createSimpleSlides() {
     try {
         const markdown = editor.getValue();
         const previewContent = document.getElementById('preview-content');
+        const previewContainer = document.querySelector('.preview-container');
+        
+        // プレビューコンテナのスタイルを強制的に変更
+        if (previewContainer) {
+            previewContainer.style.display = 'flex';
+            previewContainer.style.justifyContent = 'center';
+            previewContainer.style.alignItems = 'center';
+            previewContainer.style.padding = '20px';
+            previewContainer.style.backgroundColor = '#f0f0f0';
+        }
         
         // ---でスライドを分割
         const slideTexts = markdown.split(/^---$/m);
-        totalSlides = slideTexts.filter(text => text.trim()).length;
-        currentSlideIndex = 0;
+        const validSlides = slideTexts.filter(text => text.trim());
+        totalSlides = validSlides.length;
+        currentSlideIndex = Math.min(currentSlideIndex, totalSlides - 1);
         
-        let slidesHtml = '';
-        slideTexts.forEach((slideText, index) => {
-            const cleanText = slideText.trim();
-            if (cleanText) {
-                // 簡易Markdown変換
-                let html = cleanText
-                    .replace(/^# (.*$)/gm, '<h1 style="font-size: 3em; margin-bottom: 0.5em;">$1</h1>')
-                    .replace(/^## (.*$)/gm, '<h2 style="font-size: 2.5em; margin-bottom: 0.5em;">$1</h2>')
-                    .replace(/^### (.*$)/gm, '<h3 style="font-size: 2em; margin-bottom: 0.5em;">$1</h3>')
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/^- (.*$)/gm, '<li style="font-size: 1.5em; margin: 0.5em 0;">$1</li>')
-                    .replace(/\n\n/g, '<br><br>')
-                    .replace(/\n/g, '<br>');
-                
-                // リストを<ul>で囲む
-                html = html.replace(/(<li.*?<\/li>)/g, '<ul style="text-align: left; max-width: 80%;">$1</ul>');
-                
-                const display = index === currentSlideIndex ? 'flex' : 'none';
-                slidesHtml += `
-                    <section style="
-                        display: ${display};
-                        width: 100%;
-                        height: 100%;
-                        padding: 60px;
-                        box-sizing: border-box;
-                        background: white;
-                        border: 2px solid #ddd;
-                        border-radius: 8px;
-                        text-align: center;
-                        flex-direction: column;
-                        justify-content: center;
-                        align-items: center;
-                        font-family: Arial, sans-serif;
-                        line-height: 1.6;
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                    ">
-                        ${html}
-                    </section>
-                `;
-            }
-        });
+        if (totalSlides === 0) {
+            previewContent.innerHTML = '<div style="text-align: center; padding: 40px;">スライドが見つかりません</div>';
+            return;
+        }
         
-        previewContent.innerHTML = `<div style="position: relative; width: 100%; height: 100%;">${slidesHtml}</div>`;
+        // 現在のスライドのみを表示
+        const currentSlideText = validSlides[currentSlideIndex].trim();
+        
+        // 簡易Markdown変換
+        let html = currentSlideText
+            .replace(/^---\s*$/gm, '') // --- を削除
+            .replace(/^marp:\s*true\s*$/gm, '') // marp: true を削除
+            .replace(/^theme:\s*\w+\s*$/gm, '') // theme: を削除
+            .replace(/^# (.*$)/gm, '<h1 style="font-size: 4em; margin: 0.5em 0; color: #333;">$1</h1>')
+            .replace(/^## (.*$)/gm, '<h2 style="font-size: 3em; margin: 0.5em 0; color: #444;">$1</h2>')
+            .replace(/^### (.*$)/gm, '<h3 style="font-size: 2.5em; margin: 0.5em 0; color: #555;">$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #d63384;">$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em style="color: #6f42c1;">$1</em>')
+            .replace(/^- (.*$)/gm, '<li style="font-size: 1.8em; margin: 0.3em 0; list-style-type: disc;">$1</li>')
+            .replace(/^\d+\. (.*$)/gm, '<li style="font-size: 1.8em; margin: 0.3em 0;">$1</li>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g, '<br>');
+        
+        // リストを<ul>で囲む
+        html = html.replace(/(<li.*?<\/li>(?:<br>)*)+/g, '<ul style="text-align: left; margin: 1em 0; padding-left: 2em;">$&</ul>');
+        
+        // スライドHTMLを作成
+        previewContent.innerHTML = `
+            <div style="
+                width: 90%;
+                max-width: 1000px;
+                height: 600px;
+                background: white;
+                border: 3px solid #007bff;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 60px;
+                box-sizing: border-box;
+                font-family: 'Arial', 'Helvetica', sans-serif;
+                line-height: 1.6;
+                text-align: center;
+                position: relative;
+            ">
+                ${html}
+                <div style="
+                    position: absolute;
+                    bottom: 20px;
+                    right: 30px;
+                    background: rgba(0,123,255,0.8);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 1.2em;
+                    font-weight: bold;
+                ">
+                    ${currentSlideIndex + 1} / ${totalSlides}
+                </div>
+            </div>
+        `;
+        
         updateSlideCounter();
-        console.log(`Simple slide mode: ${totalSlides} slides created`);
+        console.log(`Simple slide mode: showing slide ${currentSlideIndex + 1} of ${totalSlides}`);
+        
+        // プレビューコントロールを表示
+        const previewControls = document.querySelector('.preview-controls');
+        if (previewControls) {
+            previewControls.style.display = 'flex';
+        }
+        
     } catch (error) {
         console.error('Simple slides creation failed:', error);
-        showError('スライド作成に失敗しました');
+        const previewContent = document.getElementById('preview-content');
+        previewContent.innerHTML = `<div style="color: red; padding: 40px; text-align: center;">スライド作成エラー: ${error.message}</div>`;
     }
 }
+
 
 
 // Updated preview function with mode switching
@@ -783,19 +822,28 @@ function loadSettings() {
 }
 
 // Slide navigation functions
+// nextSlide関数を修正
 function nextSlide() {
     if (currentSlideIndex < totalSlides - 1) {
         currentSlideIndex++;
-        updatePreview();
+        if (isSlideMode) {
+            createSimpleSlides();
+        }
+        console.log(`Next slide: ${currentSlideIndex + 1}/${totalSlides}`);
     }
 }
 
+// prevSlide関数を修正
 function prevSlide() {
     if (currentSlideIndex > 0) {
         currentSlideIndex--;
-        updatePreview();
+        if (isSlideMode) {
+            createSimpleSlides();
+        }
+        console.log(`Previous slide: ${currentSlideIndex + 1}/${totalSlides}`);
     }
 }
+
 
 // Utility functions for UI feedback
 function showLoading() {
