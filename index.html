@@ -6,21 +6,10 @@
     <title>Marp PWA - Markdown to Slide Converter</title>
     <meta name="description" content="Progressive Web App for converting Markdown to beautiful slides using Marp">
     <meta name="theme-color" content="#21808d">
-    
-    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
-    
-    <!-- Icons -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzIiIGhlaWdodD0iNzIiIHZpZXdCb3g9IjAgMCA3MiA3MiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjcyIiBoZWlnaHQ9IjcyIiByeD0iMTYiIGZpbGw9IiMyMTgwOGQiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmY2ZjZjkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KPHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIgcnk9IjIiLz4KPGxpbmUgeDE9IjkiIHkxPSI5IiB4Mj0iMTUiIHkyPSI5Ii8+CjxsaW5lIHgxPSI5IiB5MT0iMTMiIHgyPSIxNSIgeTI9IjEzIi8+CjxsaW5lIHgxPSI5IiB5MT0iMTciIHgyPSIxMyIgeTI9IjE3Ii8+Cjwvc3ZnPgo8L3N2Zz4K">
-    
-<!-- 必須: headタグ内に追加 -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked@latest/marked.min.js"></script>
- <script defer src="https://cdn.jsdelivr.net/npm/@marp-team/marp-core@latest/lib/browser.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-  <link rel="stylesheet" href="style.css">
+    <link rel="icon" ...> <!-- 省略 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -180,8 +169,13 @@
     </footer>
 
     <!-- Scripts -->
+    <!-- 必須CDNスクリプトはbodyの一番下、app.jsより前に1回だけ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@latest/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@marp-team/marp-core@latest/lib/browser.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
     <script src="app.js"></script>
-    
     <!-- Service Worker Registration 
     <script>
         if ('serviceWorker' in navigator) {
