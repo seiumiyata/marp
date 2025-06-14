@@ -1,31 +1,21 @@
 {
-  "name": "Marp PWA - Markdown to Slide Converter",
+  "name": "Marp PWA Editor",
   "short_name": "MarpPWA",
-  "description": "Markdown から Marp スライドを作成するPWAアプリケーション",
-  "start_url": "/",
+  "description": "Markdownでスライドを作成するPWAアプリケーション",
+  "start_url": ".",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#fcfcf9",
-  "theme_color": "#21808d",
-  "scope": "/",
-  "lang": "ja",
+  "background_color": "#f4f4f9",
+  "theme_color": "#007acc",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%2321808d'/><text y='96' x='96' text-anchor='middle' dy='0.35em' font-size='120' fill='white' font-family='Arial'>M</text></svg>",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%2321808d'/><text y='256' x='256' text-anchor='middle' dy='0.35em' font-size='320' fill='white' font-family='Arial'>M</text></svg>",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
     }
-  ],
-  "categories": [
-    "productivity",
-    "utilities"
-  ],
-  "screenshots": []
+  ]
 }
