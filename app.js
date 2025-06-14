@@ -1,921 +1,399 @@
-// Global variables
-let marp;
-let editor;
-let currentSlideIndex = 0;
-let totalSlides = 1;
-let autoSaveTimer;
-let isPreviewVisible = true;
-let currentSettings = {
-    theme: 'default',
-    fontSize: 'medium',
-    customFontSize: 16,
-    slideRatio: '16:9',
-    backgroundColor: '#ffffff',
-    textColor: '#000000'
-};
-
-// Default markdown content
-const defaultMarkdown = `---
+// 簡単で堅牢なMarp PWAエディター
+(function() {
+    'use strict';
+    
+    // アプリケーション状態
+    const state = {
+        isSlideMode: true,
+        currentSlide: 0,
+        slides: [],
+        elements: {}
+    };
+    
+    // デフォルトコンテンツ
+    const defaultMarkdown = `---
 marp: true
 theme: default
 ---
 
-# Welcome to Marp Slide Converter
-
-Powerful Markdown-based slide creation tool
-
----
-
-## Features
-
-- **Real-time Preview** 📺
-- **Multiple Export Formats** 📁
-- **Auto-save Functionality** 💾
-- **Responsive Design** 📱
+# Marp PWA エディター
+Markdownからスライドを作成
 
 ---
 
-## Getting Started
-
-1. Write your slides in Markdown
-2. See live preview on the right
-3. Export to PDF, PPTX, or HTML
-4. Share your presentation!
+## 機能紹介
+- **リアルタイムプレビュー**
+- **スライド⇔Markdown表示切り替え**
+- **PDF/PPTX/HTML出力**
+- **自動保存**
 
 ---
 
-# Thank You!
+## 使い方
+1. 左ペインでMarkdownを編集
+2. 右ペインでプレビュー確認
+3. プレビューモードを切り替え
+4. エクスポートで保存
 
-Happy presenting! 🎉`;
+---
 
-// Initialize application
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('DOM Content Loaded');
-    try {
-        showLoading();
-        
-        // Wait for external libraries to load
-        await waitForLibraries();
-        
-        await initializeMarp();
-        await initializeEditor();
-        initializeEventListeners();
-        loadDefaultContent();
-        
-        hideLoading();
-        showSuccess('アプリケーションが正常に初期化されました');
-    } catch (error) {
-        hideLoading();
-        showError('アプリケーションの初期化に失敗しました: ' + error.message);
-        console.error('Initialization error:', error);
-        
-        // Fallback: try to initialize with basic functionality
-        initializeFallback();
-    }
-});
+# はじめましょう！
+素晴らしいスライドを作成してください 🎉`;
 
-// Wait for external libraries to load
-function waitForLibraries() {
-    return new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 50;
-        
-        const checkLibraries = () => {
-            attempts++;
-            console.log(`Checking libraries attempt ${attempts}`);
-            
-            if (typeof Marp !== 'undefined' && typeof CodeMirror !== 'undefined') {
-                console.log('All libraries loaded successfully');
-                resolve();
-            } else if (attempts >= maxAttempts) {
-                console.log('Libraries failed to load, using fallback');
-                reject(new Error('External libraries failed to load'));
-            } else {
-                setTimeout(checkLibraries, 200);
-            }
-        };
-        
-        checkLibraries();
-    });
-}
-
-// Initialize Marp
-async function initializeMarp() {
-    try {
-        if (typeof Marp === 'undefined') {
-            throw new Error('Marp Core ライブラリが読み込まれていません');
-        }
-        marp = new Marp.Marp({
-            html: true,
-            breaks: true
-        });
-        console.log('Marp initialized successfully');
-    } catch (error) {
-        console.error('Marp initialization failed:', error);
-        throw error;
-    }
-}
-
-// Initialize CodeMirror editor
-async function initializeEditor() {
-    try {
-        const textarea = document.getElementById('markdown-editor');
-        
-        if (typeof CodeMirror !== 'undefined') {
-            editor = CodeMirror.fromTextArea(textarea, {
-                mode: 'markdown',
-                theme: 'default',
-                lineNumbers: true,
-                lineWrapping: true,
-                autofocus: true,
-                indentUnit: 2,
-                tabSize: 2,
-                extraKeys: {
-                    'Ctrl-S': function() { saveMarkdownFile(); },
-                    'Ctrl-P': function() { togglePreview(); }
-                }
-            });
-            
-            editor.on('change', function() {
-                updatePreview();
-                updateCharCount();
-                setSaveStatus('unsaved');
-                scheduleAutoSave();
-            });
-            
-            console.log('CodeMirror initialized successfully');
-        } else {
-            // Fallback to plain textarea
-            console.log('Using fallback textarea editor');
-            editor = {
-                getValue: () => textarea.value,
-                setValue: (value) => { textarea.value = value; },
-                on: () => {} // Dummy function
-            };
-            
-            textarea.addEventListener('input', function() {
-                updatePreview();
-                updateCharCount();
-                setSaveStatus('unsaved');
-                scheduleAutoSave();
-            });
-            
-            textarea.style.display = 'block';
-        }
-    } catch (error) {
-        console.error('Editor initialization failed:', error);
-        throw error;
-    }
-}
-
-// Initialize fallback functionality
-function initializeFallback() {
-    try {
-        console.log('Initializing fallback functionality');
-        
-        // Simple textarea editor
-        const textarea = document.getElementById('markdown-editor');
-        textarea.style.display = 'block';
-        textarea.value = defaultMarkdown;
-        
-        editor = {
-            getValue: () => textarea.value,
-            setValue: (value) => { textarea.value = value; },
-            on: () => {}
-        };
-        
-        textarea.addEventListener('input', function() {
-            updatePreviewFallback();
-            updateCharCount();
-            setSaveStatus('unsaved');
-            scheduleAutoSave();
-        });
-        
-        // Initialize event listeners
-        initializeEventListeners();
-        
-        // Load content
-        updatePreviewFallback();
-        updateCharCount();
-        setSaveStatus('saved');
-        
-        showSuccess('フォールバックモードで初期化されました');
-    } catch (error) {
-        console.error('Fallback initialization failed:', error);
-        showError('フォールバック初期化に失敗しました: ' + error.message);
-    }
-}
-
-// Initialize event listeners
-function initializeEventListeners() {
-    try {
-        console.log('Initializing event listeners');
-        
-        // Toolbar buttons
-        const saveBtn = document.getElementById('save-md-btn');
-        const exportPdfBtn = document.getElementById('export-pdf');
-        const exportPptxBtn = document.getElementById('export-pptx');
-        const exportHtmlBtn = document.getElementById('export-html');
-        const settingsBtn = document.getElementById('settings-btn');
-        const previewToggleBtn = document.getElementById('preview-toggle');
-        
-        if (saveBtn) saveBtn.addEventListener('click', saveMarkdownFile);
-        if (exportPdfBtn) exportPdfBtn.addEventListener('click', () => exportToPDF());
-        if (exportPptxBtn) exportPptxBtn.addEventListener('click', () => exportToPPTX());
-        if (exportHtmlBtn) exportHtmlBtn.addEventListener('click', () => exportToHTML());
-        if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
-        if (previewToggleBtn) previewToggleBtn.addEventListener('click', togglePreview);
-        
-        // Slide navigation
-        const prevBtn = document.getElementById('prev-slide');
-        const nextBtn = document.getElementById('next-slide');
-        if (prevBtn) prevBtn.addEventListener('click', previousSlide);
-        if (nextBtn) nextBtn.addEventListener('click', nextSlide);
-        
-        // Settings panel
-        const settingsClose = document.getElementById('settings-close');
-        const applyBtn = document.getElementById('apply-settings');
-        const resetBtn = document.getElementById('reset-settings');
-        const settingsOverlay = document.querySelector('.settings-overlay');
-        
-        if (settingsClose) settingsClose.addEventListener('click', closeSettings);
-        if (applyBtn) applyBtn.addEventListener('click', applySettings);
-        if (resetBtn) resetBtn.addEventListener('click', resetSettings);
-        if (settingsOverlay) settingsOverlay.addEventListener('click', closeSettings);
-        
-        // Settings form
-        const fontSizeSelect = document.getElementById('font-size-select');
-        if (fontSizeSelect) fontSizeSelect.addEventListener('change', toggleCustomFontSize);
-        
-        // Toast close buttons
-        const errorClose = document.getElementById('error-close');
-        const successClose = document.getElementById('success-close');
-        if (errorClose) errorClose.addEventListener('click', hideError);
-        if (successClose) successClose.addEventListener('click', hideSuccess);
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', handleKeyboardShortcuts);
-        
-        // Prevent settings panel close when clicking content
-        const settingsContent = document.querySelector('.settings-content');
-        if (settingsContent) {
-            settingsContent.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-        
-        console.log('Event listeners initialized successfully');
-    } catch (error) {
-        console.error('Event listener initialization failed:', error);
-        showError('イベントリスナーの初期化に失敗しました: ' + error.message);
-    }
-}
-
-// Load default content
-function loadDefaultContent() {
-    try {
-        if (editor && editor.setValue) {
-            editor.setValue(defaultMarkdown);
-        }
-        updatePreview();
-        updateCharCount();
-        setSaveStatus('saved');
-    } catch (error) {
-        console.error('Default content loading failed:', error);
-        showError('デフォルトコンテンツの読み込みに失敗しました: ' + error.message);
-    }
-}
-
-// Update preview with Marp
-async function updatePreview() {
-    try {
-        if (!editor) return;
-        
-        const markdown = editor.getValue();
-        if (!markdown.trim()) {
-            document.getElementById('preview-content').innerHTML = '<div class="preview-placeholder"><p>プレビューするMarkdownを入力してください</p></div>';
-            updateSlideCounter(0, 0);
-            return;
-        }
-        
-        if (marp) {
-            // Use Marp for rendering
-            const processedMarkdown = applySettingsToMarkdown(markdown);
-            const result = marp.render(processedMarkdown);
-            
-            if (result && result.html) {
-                document.getElementById('preview-content').innerHTML = result.html;
-                
-                // Count slides
-                const slides = document.querySelectorAll('#preview-content section');
-                totalSlides = slides.length;
-                currentSlideIndex = Math.min(currentSlideIndex, Math.max(0, totalSlides - 1));
-                
-                updateSlideCounter(currentSlideIndex + 1, totalSlides);
-                showCurrentSlide();
-            } else {
-                throw new Error('Markdownの変換に失敗しました');
-            }
-        } else {
-            // Fallback preview
-            updatePreviewFallback();
-        }
-    } catch (error) {
-        console.error('Preview update error:', error);
-        document.getElementById('preview-content').innerHTML = `<div class="error-message">プレビューエラー: ${error.message}</div>`;
-    }
-}
-
-// Fallback preview update
-function updatePreviewFallback() {
-    try {
-        const markdown = editor.getValue();
-        if (!markdown.trim()) {
-            document.getElementById('preview-content').innerHTML = '<div class="preview-placeholder"><p>プレビューするMarkdownを入力してください</p></div>';
-            return;
-        }
-        
-        // Simple markdown to HTML conversion
-        const html = markdown
-            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/^- (.*$)/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-            .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/^(?!<[hul])/gm, '<p>')
-            .replace(/(?<![>])$/gm, '</p>');
-        
-        document.getElementById('preview-content').innerHTML = `<div class="fallback-preview">${html}</div>`;
-        
-        // Simple slide counting (count headings as slides)
-        const headings = (markdown.match(/^#+ /gm) || []).length;
-        totalSlides = Math.max(1, headings);
-        updateSlideCounter(1, totalSlides);
-    } catch (error) {
-        console.error('Fallback preview error:', error);
-        document.getElementById('preview-content').innerHTML = `<div class="error-message">プレビューエラー: ${error.message}</div>`;
-    }
-}
-
-// Apply settings to markdown
-function applySettingsToMarkdown(markdown) {
-    try {
-        const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
-        const match = markdown.match(frontmatterRegex);
-        
-        let content = markdown;
-        if (match) {
-            content = markdown.replace(frontmatterRegex, '');
-        }
-        
-        const settings = [
-            'marp: true',
-            `theme: ${currentSettings.theme}`,
-            `size: ${currentSettings.slideRatio}`
+    // DOM要素を取得
+    function getElements() {
+        const ids = [
+            'loading', 'errorDisplay', 'app', 'markdownEditor', 'previewContent', 
+            'previewTitle', 'charCount', 'slideCounter', 'prevSlide', 'nextSlide',
+            'saveBtn', 'exportBtn', 'settingsBtn', 'previewToggle',
+            'exportModal', 'settingsModal', 'closeExport', 'closeSettings',
+            'exportPdf', 'exportPptx', 'exportHtml', 'exportMarkdown', 'applySettings'
         ];
         
-        let fontSize = '1em';
-        switch (currentSettings.fontSize) {
-            case 'small': fontSize = '0.8em'; break;
-            case 'large': fontSize = '1.2em'; break;
-            case 'custom': fontSize = `${currentSettings.customFontSize}px`; break;
-            default: fontSize = '1em';
-        }
-        
-        const style = `
-<style>
-section {
-    font-size: ${fontSize};
-    background-color: ${currentSettings.backgroundColor};
-    color: ${currentSettings.textColor};
-}
-</style>`;
-        
-        return `---\n${settings.join('\n')}\n---\n\n${style}\n\n${content}`;
-    } catch (error) {
-        console.error('Settings application error:', error);
-        return markdown;
-    }
-}
-
-// Show current slide
-function showCurrentSlide() {
-    try {
-        const slides = document.querySelectorAll('#preview-content section');
-        slides.forEach((slide, index) => {
-            slide.style.display = index === currentSlideIndex ? 'block' : 'none';
+        ids.forEach(id => {
+            state.elements[id] = document.getElementById(id);
         });
-    } catch (error) {
-        console.error('Show slide error:', error);
     }
-}
-
-// Navigation functions
-function previousSlide() {
-    if (currentSlideIndex > 0) {
-        currentSlideIndex--;
-        showCurrentSlide();
-        updateSlideCounter(currentSlideIndex + 1, totalSlides);
-    }
-}
-
-function nextSlide() {
-    if (currentSlideIndex < totalSlides - 1) {
-        currentSlideIndex++;
-        showCurrentSlide();
-        updateSlideCounter(currentSlideIndex + 1, totalSlides);
-    }
-}
-
-function updateSlideCounter(current, total) {
-    const counter = document.getElementById('slide-counter');
-    if (counter) {
-        counter.textContent = `${current} / ${total}`;
-    }
-}
-
-// Character count update
-function updateCharCount() {
-    try {
-        const content = editor.getValue();
-        const charCount = content.length;
-        const charCountElement = document.getElementById('char-count');
-        if (charCountElement) {
-            charCountElement.textContent = `${charCount.toLocaleString()} 文字`;
+    
+    // 文字数カウント更新
+    function updateCharCount() {
+        const editor = state.elements.markdownEditor;
+        const counter = state.elements.charCount;
+        if (editor && counter) {
+            counter.textContent = `${editor.value.length}文字`;
         }
-    } catch (error) {
-        console.error('Character count update error:', error);
     }
-}
-
-// Save status management
-function setSaveStatus(status) {
-    try {
-        const statusElement = document.getElementById('save-status');
-        if (!statusElement) return;
+    
+    // MarkdownをHTMLに変換
+    function markdownToHtml(markdown) {
+        if (!markdown) return '';
         
-        statusElement.className = `save-status ${status}`;
-        
-        switch (status) {
-            case 'saved':
-                statusElement.textContent = '保存済み';
-                break;
-            case 'saving':
-                statusElement.textContent = '保存中...';
-                break;
-            case 'unsaved':
-                statusElement.textContent = '未保存';
-                break;
-        }
-    } catch (error) {
-        console.error('Save status update error:', error);
+        return markdown
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            .replace(/^\* (.*$)/gim, '<li>$1</li>')
+            .replace(/^\- (.*$)/gim, '<li>$1</li>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            .replace(/(<li>.*?<\/li>)/g, '<ul>$1</ul>')
+            .replace(/<\/ul>\s*<ul>/g, '')
+            .replace(/^(.*)$/m, '<p>$1</p>')
+            .replace(/<p><h([1-6])>/g, '<h$1>')
+            .replace(/<\/h([1-6])><\/p>/g, '</h$1>')
+            .replace(/<p><ul>/g, '<ul>')
+            .replace(/<\/ul><\/p>/g, '</ul>');
     }
-}
-
-// Auto-save functionality
-function scheduleAutoSave() {
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => {
-        performAutoSave();
-    }, 3000);
-}
-
-function performAutoSave() {
-    try {
-        setSaveStatus('saving');
-        // Simulate auto-save (cannot use localStorage in sandbox)
-        setTimeout(() => {
-            setSaveStatus('saved');
-        }, 500);
-    } catch (error) {
-        setSaveStatus('unsaved');
-        console.error('Auto-save error:', error);
+    
+    // スライドに分割
+    function splitIntoSlides(markdown) {
+        const slides = markdown.split(/^---\s*$/m);
+        return slides.filter(slide => slide.trim()).map(slide => markdownToHtml(slide.trim()));
     }
-}
-
-// Export functions
-async function exportToPDF() {
-    try {
-        showLoading();
+    
+    // プレビュー更新
+    function updatePreview() {
+        const editor = state.elements.markdownEditor;
+        const preview = state.elements.previewContent;
         
-        if (typeof html2pdf === 'undefined') {
-            throw new Error('PDF エクスポートライブラリが利用できません');
-        }
+        if (!editor || !preview) return;
         
-        const previewContent = document.getElementById('preview-content');
-        if (!previewContent.innerHTML.trim()) {
-            throw new Error('エクスポートするコンテンツがありません');
-        }
+        const markdown = editor.value;
         
-        const opt = {
-            margin: 0.5,
-            filename: 'marp-slides.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
-        };
-        
-        await html2pdf().set(opt).from(previewContent).save();
-        
-        hideLoading();
-        showSuccess('PDFエクスポートが完了しました');
-    } catch (error) {
-        hideLoading();
-        showError('PDFエクスポートに失敗しました: ' + error.message);
-        console.error('PDF export error:', error);
-    }
-}
-
-async function exportToPPTX() {
-    try {
-        showLoading();
-        
-        if (typeof PptxGenJS === 'undefined') {
-            throw new Error('PowerPoint エクスポートライブラリが利用できません');
-        }
-        
-        const pres = new PptxGenJS();
-        const slides = document.querySelectorAll('#preview-content section, #preview-content h1, #preview-content h2');
-        
-        if (slides.length === 0) {
-            // Create a slide from the entire content
-            const slide = pres.addSlide();
-            const content = document.getElementById('preview-content').textContent || 'No content available';
+        if (state.isSlideMode) {
+            // スライドモード
+            state.slides = splitIntoSlides(markdown);
             
-            slide.addText(content, {
-                x: 0.5,
-                y: 0.5,
-                w: '90%',
-                h: '90%',
-                fontSize: 18,
-                color: currentSettings.textColor.replace('#', ''),
-                fill: { color: currentSettings.backgroundColor.replace('#', '') }
-            });
+            // 現在のスライドインデックス調整
+            if (state.currentSlide >= state.slides.length) {
+                state.currentSlide = Math.max(0, state.slides.length - 1);
+            }
+            
+            // スライド表示
+            const slideContent = state.slides[state.currentSlide] || '<p>スライドがありません</p>';
+            preview.innerHTML = `<div class="slide-wrapper"><section class="basic-slide">${slideContent}</section></div>`;
+            
+            // スライドカウンター表示
+            updateSlideCounter();
+            showSlideControls();
         } else {
-            slides.forEach((slideElement) => {
-                const slide = pres.addSlide();
-                const textContent = slideElement.textContent || slideElement.innerText || '';
-                
-                slide.addText(textContent, {
-                    x: 0.5,
-                    y: 0.5,
-                    w: '90%',
-                    h: '90%',
-                    fontSize: 18,
-                    color: currentSettings.textColor.replace('#', ''),
-                    fill: { color: currentSettings.backgroundColor.replace('#', '') }
-                });
-            });
+            // Markdownモード
+            const html = markdownToHtml(markdown);
+            preview.innerHTML = `<div class="markdown-preview">${html}</div>`;
+            hideSlideControls();
         }
-        
-        await pres.writeFile({ fileName: 'marp-slides.pptx' });
-        
-        hideLoading();
-        showSuccess('PowerPointエクスポートが完了しました');
-    } catch (error) {
-        hideLoading();
-        showError('PowerPointエクスポートに失敗しました: ' + error.message);
-        console.error('PPTX export error:', error);
     }
-}
-
-function exportToHTML() {
-    try {
-        const previewContent = document.getElementById('preview-content');
-        if (!previewContent.innerHTML.trim()) {
-            throw new Error('エクスポートするコンテンツがありません');
+    
+    // スライドカウンター更新
+    function updateSlideCounter() {
+        const counter = state.elements.slideCounter;
+        if (counter) {
+            const total = Math.max(1, state.slides.length);
+            const current = Math.max(1, state.currentSlide + 1);
+            counter.textContent = `${current} / ${total}`;
+        }
+    }
+    
+    // スライドコントロール表示
+    function showSlideControls() {
+        ['slideCounter', 'prevSlide', 'nextSlide'].forEach(id => {
+            const el = state.elements[id];
+            if (el) el.style.display = 'inline-block';
+        });
+    }
+    
+    // スライドコントロール非表示
+    function hideSlideControls() {
+        ['slideCounter', 'prevSlide', 'nextSlide'].forEach(id => {
+            const el = state.elements[id];
+            if (el) el.style.display = 'none';
+        });
+    }
+    
+    // プレビューモード切り替え
+    function togglePreviewMode() {
+        state.isSlideMode = !state.isSlideMode;
+        
+        const toggleBtn = state.elements.previewToggle;
+        const title = state.elements.previewTitle;
+        
+        if (toggleBtn) {
+            toggleBtn.textContent = state.isSlideMode ? '📝 Markdown表示' : '🎯 スライド表示';
+            toggleBtn.className = state.isSlideMode ? 'btn btn--primary btn--sm' : 'btn btn--secondary btn--sm';
         }
         
-        const htmlContent = `<!DOCTYPE html>
+        if (title) {
+            title.textContent = state.isSlideMode ? 'スライドプレビュー' : 'Markdownプレビュー';
+        }
+        
+        updatePreview();
+        showMessage(state.isSlideMode ? 'スライド表示モードに切り替えました' : 'Markdown表示モードに切り替えました');
+    }
+    
+    // 前のスライド
+    function previousSlide() {
+        if (state.isSlideMode && state.currentSlide > 0) {
+            state.currentSlide--;
+            updatePreview();
+        }
+    }
+    
+    // 次のスライド
+    function nextSlide() {
+        if (state.isSlideMode && state.currentSlide < state.slides.length - 1) {
+            state.currentSlide++;
+            updatePreview();
+        }
+    }
+    
+    // ファイルダウンロード
+    function downloadFile(content, filename, type) {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+    
+    // Markdown保存
+    function saveMarkdown() {
+        const editor = state.elements.markdownEditor;
+        if (editor) {
+            downloadFile(editor.value, 'slides.md', 'text/markdown');
+            showMessage('Markdownファイルを保存しました');
+        }
+    }
+    
+    // PDF出力
+    function exportToPDF() {
+        window.print();
+        showMessage('印刷ダイアログを開きました');
+        hideModal('exportModal');
+    }
+    
+    // PPTX出力（テキスト形式）
+    function exportToPPTX() {
+        const editor = state.elements.markdownEditor;
+        if (editor) {
+            const slides = editor.value.split(/^---\s*$/m).filter(s => s.trim());
+            const content = slides.map((slide, i) => `===== スライド ${i + 1} =====\n${slide.trim()}\n`).join('\n');
+            downloadFile(content, 'slides-content.txt', 'text/plain');
+            showMessage('スライドコンテンツをテキスト形式で保存しました');
+        }
+        hideModal('exportModal');
+    }
+    
+    // HTML出力
+    function exportToHTML() {
+        const editor = state.elements.markdownEditor;
+        if (editor) {
+            const slides = splitIntoSlides(editor.value);
+            const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Marp Slides</title>
     <style>
-        body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: ${currentSettings.backgroundColor}; color: ${currentSettings.textColor}; }
-        section { margin-bottom: 40px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: white; }
-        .fallback-preview { line-height: 1.6; }
-        .preview-placeholder { text-align: center; color: #666; }
-        .error-message { color: #d32f2f; background: #ffebee; padding: 16px; border-radius: 4px; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 2rem; background: #f5f5f5; }
+        .slide { background: white; margin: 2rem auto; padding: 3rem; border-radius: 8px; 
+                 box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 900px; min-height: 500px; }
+        h1 { font-size: 2.5rem; color: #333; }
+        h2 { font-size: 2rem; color: #444; }
+        h3 { font-size: 1.5rem; color: #555; }
+        strong { color: #2c5aa0; }
+        @media print { .slide { page-break-after: always; margin: 0; box-shadow: none; } }
     </style>
 </head>
 <body>
-    <h1>Marp Slides Export</h1>
-    ${previewContent.innerHTML}
+    ${slides.map(slide => `<div class="slide">${slide}</div>`).join('')}
 </body>
 </html>`;
-        
-        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'marp-slides.html';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        URL.revokeObjectURL(url);
-        showSuccess('HTMLエクスポートが完了しました');
-    } catch (error) {
-        showError('HTMLエクスポートに失敗しました: ' + error.message);
-        console.error('HTML export error:', error);
+            downloadFile(html, 'slides.html', 'text/html');
+            showMessage('HTMLファイルを保存しました');
+        }
+        hideModal('exportModal');
     }
-}
-
-// Save markdown file
-function saveMarkdownFile() {
-    try {
-        const content = editor.getValue();
-        if (!content.trim()) {
-            throw new Error('保存するコンテンツがありません');
+    
+    // モーダル表示
+    function showModal(id) {
+        const modal = state.elements[id];
+        if (modal) modal.classList.remove('hidden');
+    }
+    
+    // モーダル非表示
+    function hideModal(id) {
+        const modal = state.elements[id];
+        if (modal) modal.classList.add('hidden');
+    }
+    
+    // メッセージ表示
+    function showMessage(text, type = 'success') {
+        const msg = document.createElement('div');
+        msg.textContent = text;
+        msg.style.cssText = `
+            position: fixed; top: 20px; right: 20px; z-index: 3000;
+            padding: 12px 16px; border-radius: 8px; font-size: 14px;
+            background: ${type === 'success' ? '#d4edda' : '#f8d7da'};
+            color: ${type === 'success' ? '#155724' : '#721c24'};
+            border: 1px solid ${type === 'success' ? '#c3e6cb' : '#f5c6cb'};
+        `;
+        document.body.appendChild(msg);
+        setTimeout(() => {
+            if (msg.parentNode) msg.parentNode.removeChild(msg);
+        }, 3000);
+    }
+    
+    // イベントリスナー設定
+    function setupEvents() {
+        const { elements } = state;
+        
+        // エディター入力
+        if (elements.markdownEditor) {
+            elements.markdownEditor.addEventListener('input', () => {
+                updateCharCount();
+                updatePreview();
+            });
         }
         
-        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
+        // ボタンクリック
+        if (elements.prevSlide) elements.prevSlide.addEventListener('click', previousSlide);
+        if (elements.nextSlide) elements.nextSlide.addEventListener('click', nextSlide);
+        if (elements.saveBtn) elements.saveBtn.addEventListener('click', saveMarkdown);
+        if (elements.exportBtn) elements.exportBtn.addEventListener('click', () => showModal('exportModal'));
+        if (elements.settingsBtn) elements.settingsBtn.addEventListener('click', () => showModal('settingsModal'));
+        if (elements.previewToggle) elements.previewToggle.addEventListener('click', togglePreviewMode);
         
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'slides.md';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // モーダル
+        if (elements.closeExport) elements.closeExport.addEventListener('click', () => hideModal('exportModal'));
+        if (elements.closeSettings) elements.closeSettings.addEventListener('click', () => hideModal('settingsModal'));
         
-        URL.revokeObjectURL(url);
-        setSaveStatus('saved');
-        showSuccess('Markdownファイルが保存されました');
-    } catch (error) {
-        showError('ファイル保存に失敗しました: ' + error.message);
-        console.error('File save error:', error);
-    }
-}
-
-// Settings functions
-function openSettings() {
-    const panel = document.getElementById('settings-panel');
-    if (panel) {
-        panel.classList.add('show');
-        populateSettingsForm();
-    }
-}
-
-function closeSettings() {
-    const panel = document.getElementById('settings-panel');
-    if (panel) {
-        panel.classList.remove('show');
-    }
-}
-
-function populateSettingsForm() {
-    try {
-        const elements = {
-            'theme-select': currentSettings.theme,
-            'font-size-select': currentSettings.fontSize,
-            'font-size-input': currentSettings.customFontSize,
-            'slide-ratio-select': currentSettings.slideRatio,
-            'bg-color-input': currentSettings.backgroundColor,
-            'text-color-input': currentSettings.textColor
-        };
+        // エクスポート
+        if (elements.exportPdf) elements.exportPdf.addEventListener('click', exportToPDF);
+        if (elements.exportPptx) elements.exportPptx.addEventListener('click', exportToPPTX);
+        if (elements.exportHtml) elements.exportHtml.addEventListener('click', exportToHTML);
+        if (elements.exportMarkdown) elements.exportMarkdown.addEventListener('click', saveMarkdown);
         
-        Object.entries(elements).forEach(([id, value]) => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.value = value;
-            }
+        // 設定
+        if (elements.applySettings) elements.applySettings.addEventListener('click', () => {
+            hideModal('settingsModal');
+            showMessage('設定を適用しました');
         });
         
-        toggleCustomFontSize();
-    } catch (error) {
-        console.error('Settings form population error:', error);
-        showError('設定フォームの初期化に失敗しました: ' + error.message);
+        // キーボードショートカット
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 's') {
+                    e.preventDefault();
+                    saveMarkdown();
+                } else if (e.key === 'p') {
+                    e.preventDefault();
+                    togglePreviewMode();
+                }
+            }
+            if (e.key === 'Escape') {
+                hideModal('exportModal');
+                hideModal('settingsModal');
+            }
+        });
     }
-}
-
-function toggleCustomFontSize() {
-    const fontSize = document.getElementById('font-size-select')?.value;
-    const customInput = document.getElementById('custom-font-size');
-    if (customInput) {
-        customInput.style.display = fontSize === 'custom' ? 'block' : 'none';
-    }
-}
-
-function applySettings() {
-    try {
-        const elements = {
-            theme: document.getElementById('theme-select')?.value || 'default',
-            fontSize: document.getElementById('font-size-select')?.value || 'medium',
-            customFontSize: parseInt(document.getElementById('font-size-input')?.value) || 16,
-            slideRatio: document.getElementById('slide-ratio-select')?.value || '16:9',
-            backgroundColor: document.getElementById('bg-color-input')?.value || '#ffffff',
-            textColor: document.getElementById('text-color-input')?.value || '#000000'
-        };
-        
-        currentSettings = elements;
-        
-        updatePreview();
-        closeSettings();
-        showSuccess('設定が適用されました');
-    } catch (error) {
-        showError('設定の適用に失敗しました: ' + error.message);
-        console.error('Settings application error:', error);
-    }
-}
-
-function resetSettings() {
-    try {
-        currentSettings = {
-            theme: 'default',
-            fontSize: 'medium',
-            customFontSize: 16,
-            slideRatio: '16:9',
-            backgroundColor: '#ffffff',
-            textColor: '#000000'
-        };
-        
-        populateSettingsForm();
-        updatePreview();
-        showSuccess('設定をリセットしました');
-    } catch (error) {
-        showError('設定のリセットに失敗しました: ' + error.message);
-        console.error('Settings reset error:', error);
-    }
-}
-
-// Preview toggle
-function togglePreview() {
-    try {
-        const previewPane = document.getElementById('preview-pane');
-        const editorLayout = document.querySelector('.editor-layout');
-        const toggleBtn = document.getElementById('preview-toggle');
-        
-        if (!previewPane || !editorLayout || !toggleBtn) return;
-        
-        isPreviewVisible = !isPreviewVisible;
-        
-        if (isPreviewVisible) {
-            previewPane.classList.remove('hidden');
-            editorLayout.classList.remove('preview-hidden');
-            toggleBtn.innerHTML = '👁️ プレビュー';
-        } else {
-            previewPane.classList.add('hidden');
-            editorLayout.classList.add('preview-hidden');
-            toggleBtn.innerHTML = '👁️‍🗨️ プレビュー表示';
-        }
-    } catch (error) {
-        showError('プレビュー切り替えに失敗しました: ' + error.message);
-        console.error('Preview toggle error:', error);
-    }
-}
-
-// Keyboard shortcuts
-function handleKeyboardShortcuts(event) {
-    try {
-        if (event.ctrlKey || event.metaKey) {
-            switch (event.key.toLowerCase()) {
-                case 's':
-                    event.preventDefault();
-                    saveMarkdownFile();
-                    break;
-                case 'p':
-                    event.preventDefault();
-                    togglePreview();
-                    break;
+    
+    // アプリケーション初期化
+    function initApp() {
+        try {
+            console.log('アプリケーションを初期化しています...');
+            
+            // DOM要素取得
+            getElements();
+            
+            // 初期コンテンツ設定
+            if (state.elements.markdownEditor) {
+                state.elements.markdownEditor.value = defaultMarkdown;
+                updateCharCount();
+            }
+            
+            // イベント設定
+            setupEvents();
+            
+            // 初期プレビュー
+            updatePreview();
+            
+            // アプリ表示
+            if (state.elements.loading) state.elements.loading.style.display = 'none';
+            if (state.elements.errorDisplay) state.elements.errorDisplay.classList.add('hidden');
+            if (state.elements.app) state.elements.app.style.display = 'flex';
+            
+            console.log('アプリケーションの初期化が完了しました');
+            showMessage('アプリケーションが正常に起動しました');
+            
+        } catch (error) {
+            console.error('初期化エラー:', error);
+            
+            // エラー表示
+            if (state.elements.loading) state.elements.loading.style.display = 'none';
+            if (state.elements.errorDisplay) {
+                state.elements.errorDisplay.classList.remove('hidden');
+                const errorMsg = document.getElementById('errorMessage');
+                if (errorMsg) errorMsg.textContent = '初期化に失敗しました: ' + error.message;
             }
         }
-    } catch (error) {
-        console.error('Keyboard shortcut error:', error);
     }
-}
-
-// UI utility functions
-function showLoading() {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) {
-        overlay.classList.add('show');
+    
+    // DOM読み込み完了後に初期化
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        initApp();
     }
-}
-
-function hideLoading() {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) {
-        overlay.classList.remove('show');
-    }
-}
-
-function showError(message) {
-    try {
-        const errorMessage = document.getElementById('error-message');
-        const errorToast = document.getElementById('error-toast');
-        
-        if (errorMessage && errorToast) {
-            errorMessage.textContent = message;
-            errorToast.classList.add('show');
-            
-            setTimeout(() => {
-                hideError();
-            }, 5000);
-        }
-    } catch (error) {
-        console.error('Error display failed:', error);
-    }
-}
-
-function hideError() {
-    const errorToast = document.getElementById('error-toast');
-    if (errorToast) {
-        errorToast.classList.remove('show');
-    }
-}
-
-function showSuccess(message) {
-    try {
-        const successMessage = document.getElementById('success-message');
-        const successToast = document.getElementById('success-toast');
-        
-        if (successMessage && successToast) {
-            successMessage.textContent = message;
-            successToast.classList.add('show');
-            
-            setTimeout(() => {
-                hideSuccess();
-            }, 3000);
-        }
-    } catch (error) {
-        console.error('Success display failed:', error);
-    }
-}
-
-function hideSuccess() {
-    const successToast = document.getElementById('success-toast');
-    if (successToast) {
-        successToast.classList.remove('show');
-    }
-}
-
-// Error handling for unhandled errors
-window.addEventListener('error', function(event) {
-    console.error('Unhandled error:', event.error);
-    showError('予期しないエラーが発生しました: ' + (event.error?.message || 'Unknown error'));
-});
-
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('Unhandled promise rejection:', event.reason);
-    showError('非同期処理でエラーが発生しました: ' + (event.reason?.message || event.reason));
-});
-
-// Service Worker registration for PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        try {
-            const swCode = `
-                const CACHE_NAME = 'marp-converter-v1';
-                const urlsToCache = [
-                    '/',
-                    '/index.html',
-                    '/style.css',
-                    '/app.js'
-                ];
-
-                self.addEventListener('install', function(event) {
-                    event.waitUntil(
-                        caches.open(CACHE_NAME)
-                            .then(function(cache) {
-                                return cache.addAll(urlsToCache);
-                            })
-                    );
-                });
-
-                self.addEventListener('fetch', function(event) {
-                    event.respondWith(
-                        caches.match(event.request)
-                            .then(function(response) {
-                                if (response) {
-                                    return response;
-                                }
-                                return fetch(event.request);
-                            }
-                        )
-                    );
-                });
-            `;
-            
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            const swUrl = URL.createObjectURL(blob);
-            
-            navigator.serviceWorker.register(swUrl)
-                .then(function(registration) {
-                    console.log('Service Worker registered successfully:', registration.scope);
-                })
-                .catch(function(error) {
-                    console.log('Service Worker registration failed:', error);
-                });
-        } catch (error) {
-            console.error('Service Worker registration error:', error);
-        }
-    });
-}
+    
+    // グローバル参照
+    window.MarpApp = { initApp, togglePreviewMode, showMessage };
+    
+})();
