@@ -96,7 +96,6 @@ function waitForLibraries() {
     });
 }
 
-
 // Initialize Marp with error handling
 async function initializeMarp() {
     try {
@@ -275,6 +274,7 @@ function initializeEventListeners() {
 }
 
 // 新規: プレビューモード切り替え機能
+f// togglePreviewMode関数を以下に置き換え
 function togglePreviewMode() {
     try {
         isSlideMode = !isSlideMode;
@@ -284,13 +284,92 @@ function togglePreviewMode() {
             previewModeBtn.textContent = isSlideMode ? 'マークダウン表示' : 'スライド表示';
         }
         
-        updatePreview();
+        // プレビューコントロールの表示切り替え
+        const previewControls = document.querySelector('.preview-controls');
+        if (previewControls) {
+            previewControls.style.display = isSlideMode ? 'flex' : 'none';
+        }
+        
+        // 強制的にプレビューを更新
+        if (isSlideMode) {
+            createSimpleSlides();
+        } else {
+            updateMarkdownPreview(editor.getValue());
+        }
+        
+        console.log('Preview mode toggled to:', isSlideMode ? 'Slide' : 'Markdown');
         showSuccess(isSlideMode ? 'スライドモードに切り替えました' : 'マークダウンモードに切り替えました');
     } catch (error) {
         console.error('Preview mode toggle failed:', error);
         showError('プレビューモードの切り替えに失敗しました');
     }
 }
+
+// シンプルなスライド作成関数を追加
+function createSimpleSlides() {
+    try {
+        const markdown = editor.getValue();
+        const previewContent = document.getElementById('preview-content');
+        
+        // ---でスライドを分割
+        const slideTexts = markdown.split(/^---$/m);
+        totalSlides = slideTexts.filter(text => text.trim()).length;
+        currentSlideIndex = 0;
+        
+        let slidesHtml = '';
+        slideTexts.forEach((slideText, index) => {
+            const cleanText = slideText.trim();
+            if (cleanText) {
+                // 簡易Markdown変換
+                let html = cleanText
+                    .replace(/^# (.*$)/gm, '<h1 style="font-size: 3em; margin-bottom: 0.5em;">$1</h1>')
+                    .replace(/^## (.*$)/gm, '<h2 style="font-size: 2.5em; margin-bottom: 0.5em;">$1</h2>')
+                    .replace(/^### (.*$)/gm, '<h3 style="font-size: 2em; margin-bottom: 0.5em;">$1</h3>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/^- (.*$)/gm, '<li style="font-size: 1.5em; margin: 0.5em 0;">$1</li>')
+                    .replace(/\n\n/g, '<br><br>')
+                    .replace(/\n/g, '<br>');
+                
+                // リストを<ul>で囲む
+                html = html.replace(/(<li.*?<\/li>)/g, '<ul style="text-align: left; max-width: 80%;">$1</ul>');
+                
+                const display = index === currentSlideIndex ? 'flex' : 'none';
+                slidesHtml += `
+                    <section style="
+                        display: ${display};
+                        width: 100%;
+                        height: 100%;
+                        padding: 60px;
+                        box-sizing: border-box;
+                        background: white;
+                        border: 2px solid #ddd;
+                        border-radius: 8px;
+                        text-align: center;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                    ">
+                        ${html}
+                    </section>
+                `;
+            }
+        });
+        
+        previewContent.innerHTML = `<div style="position: relative; width: 100%; height: 100%;">${slidesHtml}</div>`;
+        updateSlideCounter();
+        console.log(`Simple slide mode: ${totalSlides} slides created`);
+    } catch (error) {
+        console.error('Simple slides creation failed:', error);
+        showError('スライド作成に失敗しました');
+    }
+}
+
 
 // Updated preview function with mode switching
 async function updatePreview() {
