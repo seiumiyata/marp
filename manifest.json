@@ -1,36 +1,31 @@
 {
-  "name": "Marp PWA スライドエディター",
+  "name": "Marp PWA - Markdown to Slide Converter",
   "short_name": "MarpPWA",
-  "description": "MarkdownからMarpスライドを作成するPWAアプリケーション",
-  "start_url": "./",
+  "description": "Markdown から Marp スライドを作成するPWAアプリケーション",
+  "start_url": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#fcfcf9",
   "theme_color": "#21808d",
-  "orientation": "any",
+  "scope": "/",
   "lang": "ja",
-  "scope": "./",
-  "categories": ["productivity", "education", "business"],
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%2321808d'/%3E%3Ctext y='96' x='96' text-anchor='middle' dy='0.35em' font-size='120' fill='white'%3EM%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%2321808d'/><text y='96' x='96' text-anchor='middle' dy='0.35em' font-size='120' fill='white' font-family='Arial'>M</text></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%2321808d'/%3E%3Ctext y='256' x='256' text-anchor='middle' dy='0.35em' font-size='320' fill='white'%3EM%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%2321808d'/><text y='256' x='256' text-anchor='middle' dy='0.35em' font-size='320' fill='white' font-family='Arial'>M</text></svg>",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'%3E%3Crect width='1280' height='720' fill='%23fcfcf9'/%3E%3Crect x='40' y='40' width='600' height='640' fill='white' stroke='%23e0e0e0'/%3E%3Crect x='680' y='40' width='560' height='640' fill='white' stroke='%23e0e0e0'/%3E%3Ctext x='340' y='360' text-anchor='middle' font-size='24' fill='%23333'%3EMarkdown Editor%3C/text%3E%3Ctext x='960' y='360' text-anchor='middle' font-size='24' fill='%23333'%3ESlide Preview%3C/text%3E%3C/svg%3E",
-      "sizes": "1280x720",
-      "type": "image/svg+xml",
-      "form_factor": "wide",
-      "label": "Marp PWA エディター画面"
-    }
-  ]
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
+  "screenshots": []
 }
