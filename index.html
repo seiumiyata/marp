@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Marp PWA Editor</title>
+  <!-- manifest.jsonとstyle.cssを先に読み込み -->
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
-  <!-- CodeMirror CSS -->
+  <!-- CodeMirrorのCSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
 </head>
@@ -16,14 +17,9 @@
       <h1 class="app-title">Marp PWA Editor</h1>
       <div class="header-actions">
         <button id="save-md-btn" class="btn" title="Markdownをダウンロード">💾 保存</button>
-        <div class="export-group">
-          <button id="export-btn" class="btn">📤 エクスポート</button>
-          <div id="export-options" class="export-options hidden">
-            <button id="export-pdf" class="export-option">📄 PDF</button>
-            <button id="export-pptx" class="export-option">📊 PPTX</button>
-            <button id="export-html" class="export-option">🌐 HTML</button>
-          </div>
-        </div>
+        <button id="export-pdf" class="btn" title="PDFでエクスポート">📄 PDF</button>
+        <button id="export-pptx" class="btn" title="PPTXでエクスポート">📊 PPTX</button>
+        <button id="export-html" class="btn" title="HTMLでエクスポート">🌐 HTML</button>
         <button id="settings-btn" class="btn" title="設定">⚙️</button>
       </div>
     </header>
@@ -32,51 +28,33 @@
       <div class="editor-panel">
         <div class="panel-header">
           <h2>Markdown</h2>
-          <div id="editor-status" class="status-text"></div>
         </div>
-        <textarea id="markdown-editor"></textarea>
+        <div class="editor-wrapper">
+          <textarea id="markdown-editor"></textarea>
+        </div>
       </div>
       <div class="preview-panel">
         <div class="panel-header">
-            <h2>プレビュー</h2>
-            <div id="slide-controls">
-                <button id="prev-slide" class="btn btn-sm">◀</button>
-                <span id="slide-counter">1 / 1</span>
-                <button id="next-slide" class="btn btn-sm">▶</button>
-            </div>
+          <h2>プレビュー</h2>
+          <div class="slide-controls">
+            <button id="prev-slide" class="btn btn-sm">◀</button>
+            <span id="slide-counter">1 / 1</span>
+            <button id="next-slide" class="btn btn-sm">▶</button>
+          </div>
         </div>
         <div id="preview-content" class="preview-content"></div>
       </div>
     </main>
   </div>
 
-  <!-- Settings Modal -->
-  <div id="settings-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>設定</h2>
-        <button id="settings-close-btn" class="btn-close">&times;</button>
-      </div>
-      <div class="form-group">
-        <label for="theme-select">テーマ:</label>
-        <select id="theme-select" class="form-control">
-          <option value="default">Default</option>
-          <option value="gaia">Gaia</option>
-          <option value="uncover">Uncover</option>
-        </select>
-      </div>
-      <button id="apply-settings-btn" class="btn btn-primary">適用</button>
-    </div>
-  </div>
-
-  <!-- External Libraries -->
+  <!-- 外部ライブラリの読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/@marp-team/marp-core@latest/lib/browser.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-  
-  <!-- Main App Logic (defer ensures it runs after DOM is parsed) -->
+
+  <!-- メインのJSファイルはdefer属性を付けて最後に読み込む -->
   <script src="app.js" defer></script>
 </body>
 </html>
