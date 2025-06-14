@@ -1,849 +1,385 @@
-// Global variables
-let marp;
+// ========== 初期化 ==========
 let editor;
-let currentSlideIndex = 0;
-let totalSlides = 1;
-let autoSaveTimer;
-let isPreviewVisible = true;
-let currentSettings = {
-    theme: 'default',
-    fontSize: 'medium',
-    customFontSize: 16,
-    slideRatio: '16:9',
-    backgroundColor: '#ffffff',
-    textColor: '#000000'
+let marp;
+let currentSlide = 0;
+let slideCount = 1;
+let previewMode = "slide"; // "slide" or "markdown"
+let autoSaveTimer = null;
+let lastSavedContent = "";
+
+// ========== DOM取得 ==========
+const textarea = document.getElementById('markdown-editor');
+const previewContent = document.getElementById('preview-content');
+const charCount = document.getElementById('char-count');
+const saveStatus = document.getElementById('save-status');
+const slideCounter = document.getElementById('slide-counter');
+const prevSlideBtn = document.getElementById('prev-slide');
+const nextSlideBtn = document.getElementById('next-slide');
+const previewToggleBtn = document.getElementById('preview-toggle');
+const exportPdfBtn = document.getElementById('export-pdf');
+const exportPptxBtn = document.getElementById('export-pptx');
+const exportHtmlBtn = document.getElementById('export-html');
+const saveMdBtn = document.getElementById('save-md-btn');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsPanel = document.getElementById('settings-panel');
+const settingsOverlay = document.getElementById('settings-overlay');
+const settingsClose = document.getElementById('settings-close');
+const applySettingsBtn = document.getElementById('apply-settings');
+const resetSettingsBtn = document.getElementById('reset-settings');
+const themeSelect = document.getElementById('theme-select');
+const fontSizeRadios = document.querySelectorAll('input[name="font-size"]');
+const customFontSize = document.getElementById('custom-font-size');
+const slideRatioSelect = document.getElementById('slide-ratio-select');
+const backgroundColor = document.getElementById('background-color');
+const textColor = document.getElementById('text-color');
+const loading = document.getElementById('loading');
+const errorDisplay = document.getElementById('error-display');
+const errorMessage = document.getElementById('error-message');
+const errorClose = document.getElementById('error-close');
+const successDisplay = document.getElementById('success-display');
+const successMessage = document.getElementById('success-message');
+const successClose = document.getElementById('success-close');
+
+// ========== 設定の初期値 ==========
+const defaultSettings = {
+  theme: "default",
+  fontSize: "medium",
+  customFontSize: 16,
+  slideRatio: "16:9",
+  backgroundColor: "#ffffff",
+  textColor: "#000000"
 };
+let settings = {...defaultSettings};
 
-// Default markdown content
-const defaultMarkdown = `---
-marp: true
-theme: default
----
+// ========== Marp初期化 ==========
+function initMarp() {
+  marp = new Marp({
+    html: true,
+    themeSet: [],
+    script: { source: 'cdn' }
+  });
+}
+initMarp();
 
-# Welcome to Marp Slide Converter
+// ========== CodeMirror初期化 ==========
+editor = CodeMirror.fromTextArea(textarea, {
+  mode: 'markdown',
+  lineNumbers: true,
+  lineWrapping: true,
+  theme: 'default'
+});
+editor.setSize('100%', '100%');
 
-Powerful Markdown-based slide creation tool
-
----
-
-## Features
-
-- **Real-time Preview** 📺
-- **Multiple Export Formats** 📁
-- **Auto-save Functionality** 💾
-- **Responsive Design** 📱
-
----
-
-## Getting Started
-
-1. Write your slides in Markdown
-2. See live preview on the right
-3. Export to PDF, PPTX, or HTML
-4. Share your presentation!
-
----
-
-# Thank You!
-
-Happy presenting! 🎉`;
-
-// Initialize application
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('DOM Content Loaded');
-    try {
-        showLoading();
-
-        // Wait for external libraries to load
-        await waitForLibraries();
-        await initializeMarp();
-        await initializeEditor();
-        initializeEventListeners();
-        loadDefaultContent();
-        loadAutoSavedContent();
-
-        hideLoading();
-        showSuccess('アプリケーションが正常に初期化されました');
-    } catch (error) {
-        hideLoading();
-        showError('アプリケーションの初期化に失敗しました: ' + error.message);
-        console.error('Initialization error:', error);
-
-        // Fallback: try to initialize with basic functionality
-        initializeFallback();
-    }
+// ========== イベント登録 ==========
+editor.on('change', handleEditorChange);
+prevSlideBtn.addEventListener('click', () => { changeSlide(-1); });
+nextSlideBtn.addEventListener('click', () => { changeSlide(1); });
+previewToggleBtn.addEventListener('click', togglePreviewMode);
+exportPdfBtn.addEventListener('click', exportPDF);
+exportPptxBtn.addEventListener('click', exportPPTX);
+exportHtmlBtn.addEventListener('click', exportHTML);
+saveMdBtn.addEventListener('click', saveMarkdownFile);
+settingsBtn.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', closeSettings);
+applySettingsBtn.addEventListener('click', applySettings);
+resetSettingsBtn.addEventListener('click', resetSettings);
+successClose.addEventListener('click', () => { successDisplay.style.display = "none"; });
+errorClose.addEventListener('click', () => { errorDisplay.style.display = "none"; });
+fontSizeRadios.forEach(radio => {
+  radio.addEventListener('change', () => {
+    customFontSize.disabled = !document.getElementById('font-size-custom').checked;
+  });
+});
+customFontSize.addEventListener('input', () => {
+  document.getElementById('font-size-custom').checked = true;
 });
 
-// Wait for external libraries to load
-function waitForLibraries() {
-    return new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 50;
+// ========== 自動保存 ==========
+function autoSave() {
+  const content = editor.getValue();
+  if (content !== lastSavedContent) {
+    localStorage.setItem('marp-md', content);
+    saveStatus.textContent = "保存済み";
+    lastSavedContent = content;
+  }
+}
+function startAutoSave() {
+  if (autoSaveTimer) clearInterval(autoSaveTimer);
+  autoSaveTimer = setInterval(autoSave, 3000);
+}
+startAutoSave();
 
-        const checkLibraries = () => {
-            attempts++;
-            console.log(`Checking libraries attempt ${attempts}`);
+// ========== 初期データロード ==========
+(function loadInitialData() {
+  const saved = localStorage.getItem('marp-md');
+  if (saved) {
+    editor.setValue(saved);
+    lastSavedContent = saved;
+  } else {
+    editor.setValue("# タイトル\n---\n## スライド2\n\n- 箇条書き\n- サンプル\n");
+    lastSavedContent = editor.getValue();
+  }
+  updateCharCount();
+  renderPreview();
+})();
 
-            // Check if at least basic functionality is available
-            const basicReady = document.getElementById('markdown-editor') !== null;
-            const marpReady = typeof Marp !== 'undefined';
-            const codemirrorReady = typeof CodeMirror !== 'undefined';
-
-            if (basicReady && (marpReady || codemirrorReady || attempts >= maxAttempts)) {
-                console.log('Basic functionality available, proceeding...');
-                resolve();
-            } else if (attempts >= maxAttempts) {
-                console.log('Libraries failed to load, using fallback');
-                resolve(); // Still resolve to allow fallback
-            } else {
-                setTimeout(checkLibraries, 200);
-            }
-        };
-
-        checkLibraries();
-    });
+// ========== エディタ変更時の処理 ==========
+function handleEditorChange() {
+  updateCharCount();
+  saveStatus.textContent = "未保存";
+  renderPreview();
+  startAutoSave();
 }
 
-// Initialize Marp
-async function initializeMarp() {
-    try {
-        if (typeof Marp !== 'undefined') {
-            const { Marp: MarpClass } = Marp;
-            marp = new MarpClass({
-                html: true,
-                breaks: true
-            });
-            console.log('Marp initialized successfully');
-        } else {
-            console.warn('Marp Core not available, using fallback rendering');
-            marp = null;
-        }
-    } catch (error) {
-        console.error('Marp initialization failed:', error);
-        marp = null;
-    }
-}
-
-// Initialize CodeMirror editor
-async function initializeEditor() {
-    try {
-        const textarea = document.getElementById('markdown-editor');
-
-        if (!textarea) {
-            throw new Error('markdown-editor element not found');
-        }
-
-        if (typeof CodeMirror !== 'undefined') {
-            editor = CodeMirror.fromTextArea(textarea, {
-                mode: 'markdown',
-                theme: 'default',
-                lineNumbers: true,
-                lineWrapping: true,
-                autofocus: true,
-                indentUnit: 2,
-                tabSize: 2,
-                extraKeys: {
-                    'Ctrl-S': function() { saveMarkdownFile(); },
-                    'Ctrl-P': function() { togglePreview(); }
-                }
-            });
-
-            editor.on('change', function() {
-                updatePreview();
-                updateCharCount();
-                setSaveStatus('unsaved');
-                scheduleAutoSave();
-            });
-
-            console.log('CodeMirror initialized successfully');
-        } else {
-            // Fallback to plain textarea
-            console.log('Using fallback textarea editor');
-            editor = {
-                getValue: () => textarea.value,
-                setValue: (value) => { textarea.value = value; },
-                on: () => {}
-            };
-
-            textarea.addEventListener('input', function() {
-                updatePreview();
-                updateCharCount();
-                setSaveStatus('unsaved');
-                scheduleAutoSave();
-            });
-
-            textarea.style.display = 'block';
-            textarea.style.width = '100%';
-            textarea.style.height = '100%';
-            textarea.style.border = 'none';
-            textarea.style.outline = 'none';
-            textarea.style.padding = '16px';
-            textarea.style.fontFamily = 'monospace';
-            textarea.style.fontSize = '14px';
-            textarea.style.resize = 'none';
-        }
-    } catch (error) {
-        console.error('Editor initialization failed:', error);
-        throw error;
-    }
-}
-
-// Initialize fallback functionality
-function initializeFallback() {
-    try {
-        console.log('Initializing fallback functionality');
-
-        const textarea = document.getElementById('markdown-editor');
-        if (textarea) {
-            textarea.style.display = 'block';
-            textarea.value = defaultMarkdown;
-
-            editor = {
-                getValue: () => textarea.value,
-                setValue: (value) => { textarea.value = value; },
-                on: () => {}
-            };
-
-            textarea.addEventListener('input', function() {
-                updatePreviewFallback();
-                updateCharCount();
-                setSaveStatus('unsaved');
-                scheduleAutoSave();
-            });
-        }
-
-        // Initialize event listeners
-        initializeEventListeners();
-
-        // Load content
-        updatePreviewFallback();
-        updateCharCount();
-        setSaveStatus('saved');
-
-        showSuccess('フォールバックモードで初期化されました');
-    } catch (error) {
-        console.error('Fallback initialization failed:', error);
-        showError('フォールバック初期化に失敗しました: ' + error.message);
-    }
-}
-
-// Initialize event listeners
-function initializeEventListeners() {
-    try {
-        console.log('Initializing event listeners');
-
-        // Toolbar buttons
-        safeAddEventListener('save-md-btn', 'click', saveMarkdownFile);
-        safeAddEventListener('export-pdf', 'click', () => exportToPDF());
-        safeAddEventListener('export-pptx', 'click', () => exportToPPTX());
-        safeAddEventListener('export-html', 'click', () => exportToHTML());
-        safeAddEventListener('settings-btn', 'click', openSettings);
-        safeAddEventListener('preview-toggle', 'click', togglePreview);
-
-        // Slide navigation
-        safeAddEventListener('prev-slide', 'click', previousSlide);
-        safeAddEventListener('next-slide', 'click', nextSlide);
-
-        // Settings panel
-        safeAddEventListener('settings-close', 'click', closeSettings);
-        safeAddEventListener('apply-settings', 'click', applySettings);
-        safeAddEventListener('reset-settings', 'click', resetSettings);
-
-        // Settings overlay
-        const settingsOverlay = document.querySelector('.settings-overlay');
-        if (settingsOverlay) {
-            settingsOverlay.addEventListener('click', closeSettings);
-        }
-
-        // Settings form
-        safeAddEventListener('font-size-select', 'change', toggleCustomFontSize);
-
-        // Toast close buttons
-        safeAddEventListener('error-close', 'click', hideError);
-        safeAddEventListener('success-close', 'click', hideSuccess);
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', handleKeyboardShortcuts);
-
-        // Prevent settings panel close when clicking content
-        const settingsContent = document.querySelector('.settings-content');
-        if (settingsContent) {
-            settingsContent.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-
-        console.log('Event listeners initialized successfully');
-    } catch (error) {
-        console.error('Event listener initialization failed:', error);
-        showError('イベントリスナーの初期化に失敗しました: ' + error.message);
-    }
-}
-
-// Safe event listener helper
-function safeAddEventListener(elementId, event, handler) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.addEventListener(event, handler);
-    } else {
-        console.warn(`Element with ID "${elementId}" not found`);
-    }
-}
-
-// Load default content
-function loadDefaultContent() {
-    try {
-        if (editor && editor.setValue) {
-            editor.setValue(defaultMarkdown);
-        }
-        updatePreview();
-        updateCharCount();
-        setSaveStatus('saved');
-    } catch (error) {
-        console.error('Default content loading failed:', error);
-        showError('デフォルトコンテンツの読み込みに失敗しました: ' + error.message);
-    }
-}
-
-// Load auto-saved content
-function loadAutoSavedContent() {
-    try {
-        const saved = localStorage.getItem('marp-pwa-content');
-        if (saved && saved !== defaultMarkdown) {
-            if (editor && editor.setValue) {
-                editor.setValue(saved);
-                updatePreview();
-                updateCharCount();
-                setSaveStatus('saved');
-                showSuccess('自動保存されたコンテンツを読み込みました');
-            }
-        }
-    } catch (error) {
-        console.error('Auto-saved content loading failed:', error);
-    }
-}
-
-// Update preview with Marp
-async function updatePreview() {
-    try {
-        if (!editor) return;
-
-        const markdown = editor.getValue();
-        const previewContent = document.getElementById('preview-content');
-
-        if (!previewContent) return;
-
-        if (!markdown.trim()) {
-            previewContent.innerHTML = '<p>プレビューするMarkdownを入力してください</p>';
-            updateSlideCounter(1, 1);
-            return;
-        }
-
-        if (marp) {
-            // Use Marp for rendering
-            const { html, css } = marp.render(markdown);
-
-            // Apply current settings
-            const styledHtml = `
-                <style>
-                    ${css}
-                    .marp-slide {
-                        background-color: ${currentSettings.backgroundColor};
-                        color: ${currentSettings.textColor};
-                        font-size: ${getFontSizeValue()}px;
-                    }
-                </style>
-                <div class="marp-slide">
-                    ${html}
-                </div>
-            `;
-
-            previewContent.innerHTML = styledHtml;
-
-            // Count slides
-            const slides = previewContent.querySelectorAll('section');
-            totalSlides = Math.max(slides.length, 1);
-            currentSlideIndex = Math.min(currentSlideIndex, totalSlides - 1);
-
-            updateSlideCounter(currentSlideIndex + 1, totalSlides);
-            showCurrentSlide();
-        } else {
-            // Fallback rendering
-            updatePreviewFallback();
-        }
-    } catch (error) {
-        console.error('Preview update failed:', error);
-        const previewContent = document.getElementById('preview-content');
-        if (previewContent) {
-            previewContent.innerHTML = `<p>プレビューエラー: ${error.message}</p>`;
-        }
-    }
-}
-
-// Fallback preview update
-function updatePreviewFallback() {
-    try {
-        if (!editor) return;
-
-        const markdown = editor.getValue();
-        const previewContent = document.getElementById('preview-content');
-
-        if (!previewContent) return;
-
-        if (!markdown.trim()) {
-            previewContent.innerHTML = '<p>プレビューするMarkdownを入力してください</p>';
-            return;
-        }
-
-        // Simple markdown to HTML conversion
-        const html = markdown
-            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-            .replace(/^\*\*(.*)\*\*/gm, '<strong>$1</strong>')
-            .replace(/^\*(.*)\*/gm, '<em>$1</em>')
-            .replace(/^- (.*$)/gm, '<li>$1</li>')
-            .replace(/^([^<].*$)/gm, '<p>$1</p>');
-
-        previewContent.innerHTML = `<div style="padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">${html}</div>`;
-
-        updateSlideCounter(1, 1);
-    } catch (error) {
-        console.error('Fallback preview update failed:', error);
-    }
-}
-
-// Update character count
+// ========== 文字数カウント ==========
 function updateCharCount() {
-    try {
-        const charCountElement = document.getElementById('char-count');
-        if (charCountElement && editor) {
-            const content = editor.getValue();
-            charCountElement.textContent = `${content.length} 文字`;
-        }
-    } catch (error) {
-        console.error('Character count update failed:', error);
-    }
+  charCount.textContent = `${editor.getValue().length} 文字`;
 }
 
-// Update slide counter
-function updateSlideCounter(current, total) {
-    try {
-        const slideCounter = document.getElementById('slide-counter');
-        if (slideCounter) {
-            slideCounter.textContent = `${current} / ${total}`;
-        }
-    } catch (error) {
-        console.error('Slide counter update failed:', error);
+// ========== プレビュー描画 ==========
+function renderPreview() {
+  const md = editor.getValue();
+  // 設定をYAML Frontmatterとして挿入
+  const yaml = [
+    "---",
+    `theme: ${settings.theme}`,
+    `size: ${settings.slideRatio}`,
+    `backgroundColor: "${settings.backgroundColor}"`,
+    `color: "${settings.textColor}"`,
+    `fontSize: "${getFontSize()}"`,
+    "---"
+  ].join('\n');
+  const mdWithYaml = `${yaml}\n${md}`;
+
+  try {
+    const { html, css } = marp.render(mdWithYaml);
+    // スライド分割
+    const slides = html.split(/<section class="marp-slide.*?<\/section>/gs)
+      .filter(Boolean);
+    slideCount = (html.match(/<section class="marp-slide/gs) || []).length || 1;
+    if (currentSlide >= slideCount) currentSlide = slideCount - 1;
+    if (currentSlide < 0) currentSlide = 0;
+
+    // スライドプレビュー
+    if (previewMode === "slide") {
+      const slideHtml = html.match(/<section class="marp-slide.*?<\/section>/gs) || [];
+      previewContent.innerHTML = (slideHtml[currentSlide] || "<p>スライドなし</p>") + `<style>${css}</style>`;
+    } else {
+      // Markdownプレビュー
+      previewContent.innerHTML = `<pre style="white-space:pre-wrap">${escapeHtml(md)}</pre>`;
     }
+    slideCounter.textContent = `${currentSlide + 1} / ${slideCount}`;
+  } catch (e) {
+    previewContent.innerHTML = `<div style="color:#b80000;">プレビューエラー: ${e.message}</div>`;
+  }
 }
 
-// Show current slide
-function showCurrentSlide() {
-    try {
-        const previewContent = document.getElementById('preview-content');
-        if (!previewContent) return;
-
-        const slides = previewContent.querySelectorAll('section');
-        slides.forEach((slide, index) => {
-            slide.style.display = index === currentSlideIndex ? 'block' : 'none';
-        });
-    } catch (error) {
-        console.error('Show current slide failed:', error);
-    }
+// ========== スライド切り替え ==========
+function changeSlide(delta) {
+  currentSlide += delta;
+  if (currentSlide < 0) currentSlide = 0;
+  if (currentSlide >= slideCount) currentSlide = slideCount - 1;
+  renderPreview();
 }
 
-// Navigation functions
-function previousSlide() {
-    if (currentSlideIndex > 0) {
-        currentSlideIndex--;
-        showCurrentSlide();
-        updateSlideCounter(currentSlideIndex + 1, totalSlides);
-    }
+// ========== プレビューモード切替 ==========
+function togglePreviewMode() {
+  previewMode = (previewMode === "slide") ? "markdown" : "slide";
+  document.getElementById('preview-title').textContent =
+    (previewMode === "slide") ? "リアルタイムプレビュー" : "Markdownプレビュー";
+  renderPreview();
 }
 
-function nextSlide() {
-    if (currentSlideIndex < totalSlides - 1) {
-        currentSlideIndex++;
-        showCurrentSlide();
-        updateSlideCounter(currentSlideIndex + 1, totalSlides);
-    }
+// ========== 設定UI ==========
+function openSettings() {
+  // 現在の設定をUIに反映
+  themeSelect.value = settings.theme;
+  slideRatioSelect.value = settings.slideRatio;
+  backgroundColor.value = settings.backgroundColor;
+  textColor.value = settings.textColor;
+  if (settings.fontSize === "custom") {
+    document.getElementById('font-size-custom').checked = true;
+    customFontSize.value = settings.customFontSize;
+    customFontSize.disabled = false;
+  } else {
+    document.getElementById(`font-size-${settings.fontSize}`).checked = true;
+    customFontSize.disabled = true;
+  }
+  settingsPanel.classList.remove('hidden');
+  settingsOverlay.classList.remove('hidden');
+}
+function closeSettings() {
+  settingsPanel.classList.add('hidden');
+  settingsOverlay.classList.add('hidden');
+}
+function applySettings() {
+  settings.theme = themeSelect.value;
+  settings.slideRatio = slideRatioSelect.value;
+  settings.backgroundColor = backgroundColor.value;
+  settings.textColor = textColor.value;
+  fontSizeRadios.forEach(radio => {
+    if (radio.checked) settings.fontSize = radio.value;
+  });
+  if (settings.fontSize === "custom") {
+    settings.customFontSize = parseInt(customFontSize.value, 10) || 16;
+  }
+  closeSettings();
+  renderPreview();
+  showSuccess("設定を適用しました");
+}
+function resetSettings() {
+  settings = {...defaultSettings};
+  closeSettings();
+  renderPreview();
+  showSuccess("設定をリセットしました");
+}
+function getFontSize() {
+  if (settings.fontSize === "small") return 12;
+  if (settings.fontSize === "medium") return 16;
+  if (settings.fontSize === "large") return 24;
+  if (settings.fontSize === "custom") return settings.customFontSize;
+  return 16;
 }
 
-// Save functions
-function setSaveStatus(status) {
-    try {
-        const saveStatusElement = document.getElementById('save-status');
-        if (saveStatusElement) {
-            saveStatusElement.className = `save-status ${status}`;
-            switch (status) {
-                case 'saved':
-                    saveStatusElement.textContent = '保存済み';
-                    break;
-                case 'saving':
-                    saveStatusElement.textContent = '保存中...';
-                    break;
-                case 'unsaved':
-                    saveStatusElement.textContent = '未保存';
-                    break;
-            }
-        }
-    } catch (error) {
-        console.error('Save status update failed:', error);
-    }
-}
-
-function scheduleAutoSave() {
-    if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
-    }
-
-    autoSaveTimer = setTimeout(() => {
-        try {
-            setSaveStatus('saving');
-            const content = editor.getValue();
-            localStorage.setItem('marp-pwa-content', content);
-            setSaveStatus('saved');
-        } catch (error) {
-            console.error('Auto-save failed:', error);
-            setSaveStatus('unsaved');
-        }
-    }, 3000);
-}
-
+// ========== ファイル保存・エクスポート ==========
 function saveMarkdownFile() {
-    try {
-        const content = editor.getValue();
-        const blob = new Blob([content], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `marp-slide-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.md`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        showSuccess('Markdownファイルを保存しました');
-    } catch (error) {
-        console.error('Save markdown file failed:', error);
-        showError('ファイルの保存に失敗しました: ' + error.message);
-    }
+  const blob = new Blob([editor.getValue()], {type: "text/markdown"});
+  downloadBlob(blob, "slide.md");
+  showSuccess("Markdownを保存しました");
 }
-
-// Export functions
-function exportToPDF() {
-    try {
-        const previewContent = document.getElementById('preview-content');
-        if (!previewContent) {
-            throw new Error('プレビューコンテンツが見つかりません');
-        }
-
-        if (typeof html2pdf === 'undefined') {
-            throw new Error('PDF出力ライブラリが読み込まれていません');
-        }
-
-        const opt = {
-            margin: 0,
-            filename: `marp-slide-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-        };
-
-        html2pdf().set(opt).from(previewContent).save();
-        showSuccess('PDFファイルを出力しました');
-    } catch (error) {
-        console.error('PDF export failed:', error);
-        showError('PDF出力に失敗しました: ' + error.message);
-    }
-}
-
-function exportToPPTX() {
-    try {
-        if (typeof PptxGenJS === 'undefined') {
-            throw new Error('PPTX出力ライブラリが読み込まれていません');
-        }
-
-        const pptx = new PptxGenJS();
-        const content = editor.getValue();
-
-        // Simple slide generation (basic implementation)
-        const slides = content.split('---').filter(slide => slide.trim());
-
-        slides.forEach(slideContent => {
-            const slide = pptx.addSlide();
-            slide.addText(slideContent.trim(), {
-                x: 0.5,
-                y: 1,
-                w: 9,
-                h: 5,
-                fontSize: 18,
-                color: currentSettings.textColor
-            });
-        });
-
-        pptx.writeFile({ fileName: `marp-slide-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pptx` });
-        showSuccess('PPTXファイルを出力しました');
-    } catch (error) {
-        console.error('PPTX export failed:', error);
-        showError('PPTX出力に失敗しました: ' + error.message);
-    }
-}
-
-function exportToHTML() {
-    try {
-        const previewContent = document.getElementById('preview-content');
-        if (!previewContent) {
-            throw new Error('プレビューコンテンツが見つかりません');
-        }
-
-        const html = `<!DOCTYPE html>
+function exportHTML() {
+  const md = editor.getValue();
+  const yaml = [
+    "---",
+    `theme: ${settings.theme}`,
+    `size: ${settings.slideRatio}`,
+    `backgroundColor: "${settings.backgroundColor}"`,
+    `color: "${settings.textColor}"`,
+    `fontSize: "${getFontSize()}"`,
+    "---"
+  ].join('\n');
+  const mdWithYaml = `${yaml}\n${md}`;
+  const { html, css } = marp.render(mdWithYaml);
+  const doc = `<!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marp Slides</title>
-    <style>
-        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-        .slide { margin-bottom: 40px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
-    </style>
+<meta charset="UTF-8">
+<title>Marp Slide Export</title>
+<style>${css}</style>
 </head>
 <body>
-    ${previewContent.innerHTML}
+${html}
 </body>
 </html>`;
-
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `marp-slide-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.html`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        showSuccess('HTMLファイルを出力しました');
-    } catch (error) {
-        console.error('HTML export failed:', error);
-        showError('HTML出力に失敗しました: ' + error.message);
-    }
+  const blob = new Blob([doc], {type: "text/html"});
+  downloadBlob(blob, "slide.html");
+  showSuccess("HTMLをエクスポートしました");
 }
-
-// Settings functions
-function openSettings() {
-    const settingsPanel = document.getElementById('settings-panel');
-    if (settingsPanel) {
-        settingsPanel.classList.add('show');
-        loadCurrentSettings();
-    }
+function exportPDF() {
+  showLoading(true);
+  setTimeout(() => {
+    const md = editor.getValue();
+    const yaml = [
+      "---",
+      `theme: ${settings.theme}`,
+      `size: ${settings.slideRatio}`,
+      `backgroundColor: "${settings.backgroundColor}"`,
+      `color: "${settings.textColor}"`,
+      `fontSize: "${getFontSize()}"`,
+      "---"
+    ].join('\n');
+    const mdWithYaml = `${yaml}\n${md}`;
+    const { html, css } = marp.render(mdWithYaml);
+    // 全スライドを1ページずつPDF化
+    const slideHtml = html.match(/<section class="marp-slide.*?<\/section>/gs) || [];
+    const container = document.createElement('div');
+    slideHtml.forEach(slide => {
+      const div = document.createElement('div');
+      div.innerHTML = slide + `<style>${css}</style>`;
+      div.style.pageBreakAfter = 'always';
+      container.appendChild(div);
+    });
+    html2pdf().from(container).set({
+      margin: 0,
+      filename: 'slide.pdf',
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' }
+    }).save().then(() => {
+      showLoading(false);
+      showSuccess("PDFをエクスポートしました");
+    }).catch(err => {
+      showLoading(false);
+      showError("PDFエクスポート失敗: " + err.message);
+    });
+  }, 100);
 }
-
-function closeSettings() {
-    const settingsPanel = document.getElementById('settings-panel');
-    if (settingsPanel) {
-        settingsPanel.classList.remove('show');
-    }
-}
-
-function loadCurrentSettings() {
-    try {
-        const themeSelect = document.getElementById('theme-select');
-        const fontSizeSelect = document.getElementById('font-size-select');
-        const customFontSize = document.getElementById('custom-font-size');
-        const slideRatioSelect = document.getElementById('slide-ratio-select');
-        const backgroundColor = document.getElementById('background-color');
-        const textColor = document.getElementById('text-color');
-
-        if (themeSelect) themeSelect.value = currentSettings.theme;
-        if (fontSizeSelect) fontSizeSelect.value = currentSettings.fontSize;
-        if (customFontSize) customFontSize.value = currentSettings.customFontSize;
-        if (slideRatioSelect) slideRatioSelect.value = currentSettings.slideRatio;
-        if (backgroundColor) backgroundColor.value = currentSettings.backgroundColor;
-        if (textColor) textColor.value = currentSettings.textColor;
-
-        toggleCustomFontSize();
-    } catch (error) {
-        console.error('Load current settings failed:', error);
-    }
-}
-
-function applySettings() {
-    try {
-        const themeSelect = document.getElementById('theme-select');
-        const fontSizeSelect = document.getElementById('font-size-select');
-        const customFontSize = document.getElementById('custom-font-size');
-        const slideRatioSelect = document.getElementById('slide-ratio-select');
-        const backgroundColor = document.getElementById('background-color');
-        const textColor = document.getElementById('text-color');
-
-        if (themeSelect) currentSettings.theme = themeSelect.value;
-        if (fontSizeSelect) currentSettings.fontSize = fontSizeSelect.value;
-        if (customFontSize) currentSettings.customFontSize = parseInt(customFontSize.value);
-        if (slideRatioSelect) currentSettings.slideRatio = slideRatioSelect.value;
-        if (backgroundColor) currentSettings.backgroundColor = backgroundColor.value;
-        if (textColor) currentSettings.textColor = textColor.value;
-
-        // Save settings to localStorage
-        localStorage.setItem('marp-pwa-settings', JSON.stringify(currentSettings));
-
-        updatePreview();
-        closeSettings();
-        showSuccess('設定を適用しました');
-    } catch (error) {
-        console.error('Apply settings failed:', error);
-        showError('設定の適用に失敗しました: ' + error.message);
-    }
-}
-
-function resetSettings() {
-    currentSettings = {
-        theme: 'default',
-        fontSize: 'medium',
-        customFontSize: 16,
-        slideRatio: '16:9',
-        backgroundColor: '#ffffff',
-        textColor: '#000000'
-    };
-
-    localStorage.removeItem('marp-pwa-settings');
-    loadCurrentSettings();
-    updatePreview();
-    showSuccess('設定をリセットしました');
-}
-
-function toggleCustomFontSize() {
-    const fontSizeSelect = document.getElementById('font-size-select');
-    const customGroup = document.getElementById('custom-font-size-group');
-
-    if (fontSizeSelect && customGroup) {
-        if (fontSizeSelect.value === 'custom') {
-            customGroup.style.display = 'block';
-        } else {
-            customGroup.style.display = 'none';
+function exportPPTX() {
+  showLoading(true);
+  setTimeout(() => {
+    const md = editor.getValue();
+    const yaml = [
+      "---",
+      `theme: ${settings.theme}`,
+      `size: ${settings.slideRatio}`,
+      `backgroundColor: "${settings.backgroundColor}"`,
+      `color: "${settings.textColor}"`,
+      `fontSize: "${getFontSize()}"`,
+      "---"
+    ].join('\n');
+    const mdWithYaml = `${yaml}\n${md}`;
+    const { html, css } = marp.render(mdWithYaml);
+    // スライドごとにテキスト抽出
+    const slideHtml = html.match(/<section class="marp-slide.*?<\/section>/gs) || [];
+    const pptx = new PptxGenJS();
+    slideHtml.forEach(slide => {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = slide;
+      let text = "";
+      tempDiv.querySelectorAll('*').forEach(el => {
+        if (el.childNodes.length && el.childNodes[0].nodeType === 3) {
+          text += el.textContent + "\n";
         }
-    }
+      });
+      pptx.addSlide().addText(text.trim(), { x:0.5, y:0.5, w:9, h:5, fontSize: getFontSize(), color: settings.textColor, fill: { color: settings.backgroundColor } });
+    });
+    pptx.writeFile({ fileName: "slide.pptx" }).then(() => {
+      showLoading(false);
+      showSuccess("PPTXをエクスポートしました");
+    }).catch(err => {
+      showLoading(false);
+      showError("PPTXエクスポート失敗: " + err.message);
+    });
+  }, 100);
+}
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); }, 500);
 }
 
-function getFontSizeValue() {
-    switch (currentSettings.fontSize) {
-        case 'small': return 12;
-        case 'medium': return 16;
-        case 'large': return 20;
-        case 'custom': return currentSettings.customFontSize;
-        default: return 16;
-    }
+// ========== ローディング・メッセージ ==========
+function showLoading(show) {
+  loading.style.display = show ? "flex" : "none";
+}
+function showSuccess(msg) {
+  successMessage.textContent = msg;
+  successDisplay.style.display = "flex";
+  setTimeout(() => { successDisplay.style.display = "none"; }, 2000);
+}
+function showError(msg) {
+  errorMessage.textContent = msg;
+  errorDisplay.style.display = "flex";
 }
 
-// Preview toggle
-function togglePreview() {
-    const previewPane = document.getElementById('preview-pane');
-    const editorLayout = document.querySelector('.editor-layout');
-
-    if (previewPane && editorLayout) {
-        isPreviewVisible = !isPreviewVisible;
-
-        if (isPreviewVisible) {
-            previewPane.style.display = 'flex';
-            editorLayout.style.gridTemplateColumns = '1fr 1fr';
-        } else {
-            previewPane.style.display = 'none';
-            editorLayout.style.gridTemplateColumns = '1fr';
-        }
-    }
+// ========== ユーティリティ ==========
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, function(m) {
+    return ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[m];
+  });
 }
-
-// Utility functions
-function showLoading() {
-    const loadingOverlay = document.getElementById('loading-overlay');
-    if (loadingOverlay) {
-        loadingOverlay.classList.add('show');
-    }
-}
-
-function hideLoading() {
-    const loadingOverlay = document.getElementById('loading-overlay');
-    if (loadingOverlay) {
-        loadingOverlay.classList.remove('show');
-    }
-}
-
-function showError(message) {
-    const errorToast = document.getElementById('error-toast');
-    const errorMessage = document.getElementById('error-message');
-
-    if (errorToast && errorMessage) {
-        errorMessage.textContent = message;
-        errorToast.classList.add('show');
-
-        setTimeout(() => {
-            errorToast.classList.remove('show');
-        }, 5000);
-    }
-
-    console.error(message);
-}
-
-function hideError() {
-    const errorToast = document.getElementById('error-toast');
-    if (errorToast) {
-        errorToast.classList.remove('show');
-    }
-}
-
-function showSuccess(message) {
-    const successToast = document.getElementById('success-toast');
-    const successMessage = document.getElementById('success-message');
-
-    if (successToast && successMessage) {
-        successMessage.textContent = message;
-        successToast.classList.add('show');
-
-        setTimeout(() => {
-            successToast.classList.remove('show');
-        }, 3000);
-    }
-
-    console.log(message);
-}
-
-function hideSuccess() {
-    const successToast = document.getElementById('success-toast');
-    if (successToast) {
-        successToast.classList.remove('show');
-    }
-}
-
-function handleKeyboardShortcuts(e) {
-    if (e.ctrlKey) {
-        switch (e.key) {
-            case 's':
-                e.preventDefault();
-                saveMarkdownFile();
-                break;
-            case 'p':
-                e.preventDefault();
-                togglePreview();
-                break;
-            case 'e':
-                e.preventDefault();
-                openSettings();
-                break;
-        }
-    }
-}
-
-// Load saved settings on startup
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        const savedSettings = localStorage.getItem('marp-pwa-settings');
-        if (savedSettings) {
-            currentSettings = { ...currentSettings, ...JSON.parse(savedSettings) };
-        }
-    } catch (error) {
-        console.error('Failed to load saved settings:', error);
-    }
-});
