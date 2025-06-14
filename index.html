@@ -1,60 +1,187 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Marp PWA Editor</title>
-  <!-- manifest.jsonとstyle.cssを先に読み込み -->
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
-  <!-- CodeMirrorのCSS -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marp Slide Converter</title>
+    <meta name="description" content="Markdown to Marp slide converter with real-time preview">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTWFycCBTbGlkZSBDb252ZXJ0ZXIiLCJzaG9ydF9uYW1lIjoiTWFycCIsInN0YXJ0X3VybCI6Ii8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZmNmY2Y5IiwidGhlbWVfY29sb3IiOiIjMjE4MDhkIiwiaWNvbnMiOlt7InNyYyI6ImRhdGE6aW1hZ2Uvc3ZnK3htbCwlM0NzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB3aWR0aD0nMTkyJyBoZWlnaHQ9JzE5Micgdmlld0JveD0nMCAwIDI0IDI0JyUzRSUzQ3JlY3Qgd2lkdGg9JzI0JyBoZWlnaHQ9JzI0JyBmaWxsPSclMjMyMTgwOGQnLyUzRSUzQ3RleHQgeD0nMTInIHk9JzE2JyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBmaWxsPSd3aGl0ZScgZm9udC1zaXplPScxNCcgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnJTNFTSUzQy90ZXh0JTNFJTNDL3N2ZyUzRSIsInNpemVzIjoiMTkyeDE5MiIsInR5cGUiOiJpbWFnZS9zdmcreG1sIn1dfQ==">
+    
+    <!-- CSS Libraries -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@marp-team/marp-core@latest/lib/browser/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@latest/dist/pptxgen.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
 </head>
 <body>
-  <div id="app">
-    <header class="app-header">
-      <h1 class="app-title">Marp PWA Editor</h1>
-      <div class="header-actions">
-        <button id="save-md-btn" class="btn" title="Markdownをダウンロード">💾 保存</button>
-        <button id="export-pdf" class="btn" title="PDFでエクスポート">📄 PDF</button>
-        <button id="export-pptx" class="btn" title="PPTXでエクスポート">📊 PPTX</button>
-        <button id="export-html" class="btn" title="HTMLでエクスポート">🌐 HTML</button>
-        <button id="settings-btn" class="btn" title="設定">⚙️</button>
-      </div>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>処理中...</p>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="error-toast" class="error-toast">
+        <span id="error-message"></span>
+        <button id="error-close" class="btn-close">&times;</button>
+    </div>
+
+    <!-- Success Toast -->
+    <div id="success-toast" class="success-toast">
+        <span id="success-message"></span>
+        <button id="success-close" class="btn-close">&times;</button>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="app-title">Marp Slide Converter</h1>
+                
+                <div class="toolbar">
+                    <button id="save-md-btn" class="btn btn--secondary" title="Markdownファイルをダウンロード (Ctrl+S)">
+                        💾 MD保存
+                    </button>
+                    
+                    <div class="export-dropdown">
+                        <button id="export-btn" class="btn btn--primary" title="エクスポート">
+                            📤 エクスポート
+                        </button>
+                        <div class="dropdown-menu">
+                            <button id="export-pdf" class="dropdown-item">PDF</button>
+                            <button id="export-pptx" class="dropdown-item">PowerPoint</button>
+                            <button id="export-html" class="dropdown-item">HTML</button>
+                        </div>
+                    </div>
+                    
+                    <button id="settings-btn" class="btn btn--outline" title="設定を開く">
+                        ⚙️ 設定
+                    </button>
+                    
+                    <button id="preview-toggle" class="btn btn--outline" title="プレビュー切り替え (Ctrl+P)">
+                        👁️ プレビュー
+                    </button>
+                </div>
+            </div>
+        </div>
     </header>
 
-    <main class="app-main">
-      <div class="editor-panel">
-        <div class="panel-header">
-          <h2>Markdown</h2>
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="editor-layout">
+                <!-- Editor Pane -->
+                <div class="editor-pane">
+                    <div class="pane-header">
+                        <h3>Markdown Editor</h3>
+                        <div class="editor-status">
+                            <span id="char-count">0 文字</span>
+                            <span id="save-status" class="save-status">未保存</span>
+                        </div>
+                    </div>
+                    <div class="editor-container">
+                        <textarea id="markdown-editor" placeholder="Markdownを入力してください..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Preview Pane -->
+                <div id="preview-pane" class="preview-pane">
+                    <div class="pane-header">
+                        <h3>リアルタイムプレビュー</h3>
+                        <div class="preview-controls">
+                            <button id="prev-slide" class="btn btn--sm" title="前のスライド">◀</button>
+                            <span id="slide-counter">1 / 1</span>
+                            <button id="next-slide" class="btn btn--sm" title="次のスライド">▶</button>
+                        </div>
+                    </div>
+                    <div id="preview-container" class="preview-container">
+                        <div id="preview-content"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="editor-wrapper">
-          <textarea id="markdown-editor"></textarea>
-        </div>
-      </div>
-      <div class="preview-panel">
-        <div class="panel-header">
-          <h2>プレビュー</h2>
-          <div class="slide-controls">
-            <button id="prev-slide" class="btn btn-sm">◀</button>
-            <span id="slide-counter">1 / 1</span>
-            <button id="next-slide" class="btn btn-sm">▶</button>
-          </div>
-        </div>
-        <div id="preview-content" class="preview-content"></div>
-      </div>
     </main>
-  </div>
 
-  <!-- 外部ライブラリの読み込み -->
-  <script src="https://cdn.jsdelivr.net/npm/@marp-team/marp-core@latest/lib/browser.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="settings-panel">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h3>設定</h3>
+                <button id="settings-close" class="btn-close">&times;</button>
+            </div>
+            
+            <div class="settings-body">
+                <div class="form-group">
+                    <label class="form-label" for="theme-select">テーマ</label>
+                    <select id="theme-select" class="form-control">
+                        <option value="default">Default</option>
+                        <option value="gaia">Gaia</option>
+                        <option value="uncover">Uncover</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="font-size-select">フォントサイズ</label>
+                    <select id="font-size-select" class="form-control">
+                        <option value="small">小</option>
+                        <option value="medium" selected>中</option>
+                        <option value="large">大</option>
+                        <option value="custom">カスタム</option>
+                    </select>
+                </div>
+                
+                <div id="custom-font-size" class="form-group" style="display: none;">
+                    <label class="form-label" for="font-size-input">カスタムサイズ (px)</label>
+                    <input id="font-size-input" type="number" class="form-control" min="8" max="72" value="16">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="slide-ratio-select">スライド比率</label>
+                    <select id="slide-ratio-select" class="form-control">
+                        <option value="16:9" selected>16:9</option>
+                        <option value="4:3">4:3</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="bg-color-input">背景色</label>
+                    <input id="bg-color-input" type="color" class="form-control" value="#ffffff">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="text-color-input">文字色</label>
+                    <input id="text-color-input" type="color" class="form-control" value="#000000">
+                </div>
+                
+                <div class="settings-actions">
+                    <button id="reset-settings" class="btn btn--outline">リセット</button>
+                    <button id="apply-settings" class="btn btn--primary">適用</button>
+                </div>
+            </div>
+        </div>
+        <div class="settings-overlay"></div>
+    </div>
 
-  <!-- メインのJSファイルはdefer属性を付けて最後に読み込む -->
-  <script src="app.js" defer></script>
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <p>&copy; 2025 Marp Slide Converter - Powered by Marp Core</p>
+                <div class="footer-links">
+                    <span>Ctrl+S: 保存</span>
+                    <span>Ctrl+P: プレビュー切り替え</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
 </body>
 </html>
